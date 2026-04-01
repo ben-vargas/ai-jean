@@ -8,6 +8,15 @@ Tauri v2 · React 19 · Rust · TypeScript · Tailwind CSS v4 · shadcn/ui v4 ·
 
 </div>
 
+## Fork Difference
+
+This fork adds explicit bind-host support for web access.
+
+- headless mode now honors literal `--host` values instead of treating everything as only `localhost` or `0.0.0.0`
+- the desktop app can bind web access to a specific interface or IP, including a Tailscale address
+
+That means you can expose Jean only on your tailnet, for example by binding to a `100.x.y.z` Tailscale IP, instead of opening it on every network interface.
+
 ## About the Project
 
 Jean is an opinionated native desktop app built with Tauri that gives you a powerful interface for working with Claude CLI, Codex CLI, and OpenCode across multiple projects. It has strong opinions about how AI-assisted development should work — managing git worktrees, chat sessions, terminals, and GitHub integrations in one cohesive workflow.
