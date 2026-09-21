@@ -178,6 +178,19 @@ describe('magic prompt preference resolvers', () => {
     )
   })
 
+  it.each([
+    ['issue', DEFAULT_INVESTIGATE_ISSUE_PROMPT],
+    ['pull request', DEFAULT_INVESTIGATE_PR_PROMPT],
+    ['security advisory', DEFAULT_INVESTIGATE_ADVISORY_PROMPT],
+  ])('validates the %s before deeper investigation', (_name, prompt) => {
+    const normalized = prompt.toLowerCase()
+
+    expect(normalized).toContain('1. validate')
+    expect(normalized).toContain('still valid')
+    expect(normalized).toContain('whether it makes sense to work on it now')
+    expect(normalized).toContain('if not, stop and explain why')
+  })
+
   it('keeps fixing and pushing workflow failures until the pushed commit is green', () => {
     const prompt = DEFAULT_INVESTIGATE_WORKFLOW_RUN_PROMPT.toLowerCase()
 

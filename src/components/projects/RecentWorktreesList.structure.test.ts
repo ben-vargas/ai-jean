@@ -43,6 +43,16 @@ describe('RecentWorktreesList structure', () => {
     expect(source).not.toContain('absolute right-3 top-2')
   })
 
+  it('shows the finished-session bell on unread recent sessions', () => {
+    expect(source).toContain(
+      "import { isUnreadSession } from '@/components/unread/unread-utils'"
+    )
+    expect(source).toContain('const isUnread = isUnreadSession(row.session)')
+    expect(source).toContain('{isUnread && (')
+    expect(source).toContain('aria-label="Unread session"')
+    expect(source).toContain('text-yellow-400')
+  })
+
   it('uses fully rounded rows and a full background for the current row', () => {
     expect(source).toContain('className="flex flex-col gap-2 px-2 py-2"')
     expect(source).toContain('rounded-lg border px-3 py-2.5')

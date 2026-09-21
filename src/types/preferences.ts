@@ -98,7 +98,10 @@ Investigate the loaded GitHub {issueWord} ({issueRefs})
 
 <instructions>
 
-1. Read the issue context file(s) to understand the full problem description and comments
+1. Validate the issue before deeper investigation:
+   - Read the issue context file(s), including its current status, description, and comments
+   - Confirm that the issue is still valid, relevant, and not already resolved or superseded
+   - Decide whether it makes sense to work on it now; if not, stop and explain why
 2. Analyze the problem:
    - What is the expected vs actual behavior?
    - Are there error messages, stack traces, or reproduction steps?
@@ -142,7 +145,10 @@ Investigate the loaded GitHub {prWord} ({prRefs})
 
 <instructions>
 
-1. Read the PR context file(s) to understand the full description, reviews, and comments
+1. Validate the PR before deeper investigation:
+   - Read the PR context file(s), including its current status, description, reviews, and comments
+   - Confirm that the PR is still valid, relevant, and not already merged, closed, or superseded
+   - Decide whether it makes sense to work on it now; if not, stop and explain why
 2. Understand the changes:
    - What is the PR trying to accomplish?
    - What branches are involved (head → base)?
@@ -425,7 +431,10 @@ Investigate the loaded security {advisoryWord} ({advisoryRefs})
 
 <instructions>
 
-1. Read the advisory context file(s) for full vulnerability details (GHSA ID, CVE, severity, affected versions, CWE)
+1. Validate the advisory before deeper investigation:
+   - Read the advisory context file(s), including its current status and full vulnerability details (GHSA ID, CVE, severity, affected versions, CWE)
+   - Confirm that the advisory is still valid, relevant, and not already resolved or superseded
+   - Decide whether it makes sense to work on it now; if not, stop and explain why
 2. Understand the vulnerability:
    - What type of vulnerability is it (injection, auth bypass, XSS, etc.)?
    - What are the preconditions for exploitation?

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Plus } from '@/components/icons/reicon'
+import { AlertTriangle, BellDot, Plus } from '@/components/icons/reicon'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useChatStore } from '@/store/chat-store'
 import { useProjectsStore } from '@/store/projects-store'
@@ -8,6 +8,7 @@ import { useUIStore } from '@/store/ui-store'
 import { fetchRecentWorktrees } from '@/services/projects'
 import { fetchWorktreesStatus } from '@/services/git-status'
 import type { Project, RecentWorktreeItem } from '@/types/projects'
+import { isUnreadSession } from '@/components/unread/unread-utils'
 import { getRecentSessionStatus } from './recent-session-status'
 
 const INITIAL_RECENT_LIMIT = 10
@@ -232,6 +233,7 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
                   ? 'text-red-600 dark:text-red-400'
                   : 'text-muted-foreground'
             const isWorking = status.tone === 'working'
+            const isUnread = isUnreadSession(row.session)
             return (
               <li key={row.session.id}>
                 {showSnoozed &&
@@ -251,7 +253,7 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
                   }}
                   type="button"
                   aria-current={isCurrent ? 'page' : undefined}
-                  aria-label={`${row.session.name}, ${row.projectName}, ${row.worktree.name}, ${status.label}, ${activityLabel}`}
+                  aria-label={`${row.session.name}, ${row.projectName}, ${row.worktree.name}, ${status.label}${isUnread ? ', unread' : ''}, ${activityLabel}`}
                   className={`grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1 rounded-lg border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow,color] hover:bg-muted/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${isCurrent ? 'border-border bg-muted/50 text-foreground shadow' : 'border-transparent bg-transparent text-muted-foreground'}`}
                   onClick={() => handleOpen(row)}
                 >
@@ -260,7 +262,13 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
                       ? 'Generating…'
                       : row.session.name}
                   </span>
-                  <span className="flex min-w-14 items-center justify-end text-[10px]">
+                  <span className="flex min-w-14 items-center justify-end gap-1.5 text-[10px]">
+                    {isUnread && (
+                      <BellDot
+                        aria-label="Unread session"
+                        className="size-3.5 shrink-0 text-yellow-400"
+                      />
+                    )}
                     {isWorking ? (
                       <span
                         aria-hidden="true"
