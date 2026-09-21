@@ -315,12 +315,14 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
                   >
                     {activity}
                   </time>
-                  {(row.added > 0 || row.removed > 0) && (
-                    <span className="col-start-2 flex justify-self-end gap-1 text-[10px] font-medium tabular-nums">
-                      <span className="text-green-500">+{row.added}</span>
-                      <span className="text-red-500">-{row.removed}</span>
-                    </span>
-                  )}
+                  <span className="col-start-2 flex min-h-4 justify-self-end gap-1 text-[10px] font-medium tabular-nums">
+                    {(row.added > 0 || row.removed > 0) && (
+                      <>
+                        <span className="text-green-500">+{row.added}</span>
+                        <span className="text-red-500">-{row.removed}</span>
+                      </>
+                    )}
+                  </span>
                 </button>
                 <button
                   type="button"

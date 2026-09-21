@@ -38,7 +38,10 @@ describe('RecentWorktreesList structure', () => {
     expect(source).toContain(
       'className="justify-self-end text-[10px] tabular-nums"'
     )
-    expect(source).toContain('col-start-2 flex justify-self-end gap-1')
+    expect(source).toContain('col-start-2 flex min-h-4 justify-self-end gap-1')
+    expect(source).toContain(
+      '<span className="col-start-2 flex min-h-4 justify-self-end gap-1'
+    )
     expect(source).not.toContain('pt-4')
     expect(source).not.toContain('absolute right-3 top-2')
   })
