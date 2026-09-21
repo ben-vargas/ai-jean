@@ -92,10 +92,12 @@ pub fn update_wsl_config(enabled: bool, distro: String) {
     }
 }
 
-/// Claude flags whose following argument is a filesystem path that Claude will
-/// open. When Claude runs inside WSL these must be WSL paths — a Windows-form
-/// value (e.g. `C:\Users\..`) is resolved relative to the Linux cwd and fails
-/// (notably `--append-system-prompt-file`, which aborts the whole run).
+/// CLI flags whose following argument is a filesystem path the CLI will open.
+/// Shared by the detached chat launch and native CLI terminals for every
+/// backend; the list is Claude's flags today. When the CLI runs inside WSL these
+/// must be WSL paths — a Windows-form value (e.g. `C:\Users\..`) is resolved
+/// relative to the Linux cwd and fails (notably `--append-system-prompt-file`,
+/// which aborts the whole run).
 pub const WSL_PATH_VALUE_FLAGS: &[&str] =
     &["--add-dir", "--append-system-prompt-file", "--settings"];
 
@@ -247,10 +249,10 @@ fn is_windows_batch_file(path: &str) -> bool {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct CliLaunchPlan {
-    program: String,
-    args: Vec<String>,
-    cwd: Option<std::path::PathBuf>,
+pub(crate) struct CliLaunchPlan {
+    pub(crate) program: String,
+    pub(crate) args: Vec<String>,
+    pub(crate) cwd: Option<std::path::PathBuf>,
 }
 
 /// How a Windows `.cmd`/`.bat` shim gets launched.
@@ -329,7 +331,7 @@ fn cli_launch_plan(
     }
 }
 
-fn wsl_resolved_cli_launch_plan(
+pub(crate) fn wsl_resolved_cli_launch_plan(
     program: &str,
     cwd: Option<&std::path::Path>,
     is_windows: bool,

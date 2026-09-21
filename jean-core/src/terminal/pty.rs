@@ -129,16 +129,24 @@ fn build_unix_shell_command(
     builder
 }
 
-/// Words to pass after `wsl.exe --` for a structured command.
+/// `wsl.exe` arguments for running a structured command inside the distro.
 ///
-/// wsl.exe hands everything after `--` to the distro's default shell, which
-/// re-parses it: quote each word so backslashes and shell metacharacters
-/// survive, and translate Windows path values (e.g.
-/// `--append-system-prompt-file C:\..`) so the CLI can open them.
-fn wsl_command_words(command: &str, args: &[String]) -> Vec<String> {
-    std::iter::once(command.to_string())
+/// Without `--exec`, wsl.exe hands the raw rest of its command line to
+/// `$SHELL -c`, which re-parses it: backslashes in Windows paths are lost and
+/// the Windows quoting around args with spaces or `"` reaches the shell
+/// verbatim. Exec mode splits it with `CommandLineToArgvW` instead, and the
+/// shared login-shell wrapper passes the args through `"$@"` untouched.
+fn wsl_exec_args(distro: &str, cwd: &str, command: &str, args: &[String]) -> Vec<String> {
+    let plan = crate::platform::wsl::wsl_resolved_cli_launch_plan(
+        command,
+        Some(std::path::Path::new(cwd)),
+        true,
+        true,
+        distro,
+    );
+    plan.args
+        .into_iter()
         .chain(crate::platform::wslify_path_args(args))
-        .map(|word| crate::platform::shell_escape(&word))
         .collect()
 }
 
@@ -214,15 +222,15 @@ pub fn spawn_terminal(
                 return Err("Command is empty".to_string());
             }
             let mut c = CommandBuilder::new("wsl.exe");
-            c.arg("-d");
-            c.arg(&wsl_config.distro);
-            c.arg("--cd");
-            c.arg(&unix_cwd);
-            c.arg("--");
             if let Some(ref args) = command_args {
-                c.args(wsl_command_words(run_command, args));
+                c.args(wsl_exec_args(&wsl_config.distro, &cwd, run_command, args));
             } else {
                 // Shell-wrapped command inside WSL
+                c.arg("-d");
+                c.arg(&wsl_config.distro);
+                c.arg("--cd");
+                c.arg(&unix_cwd);
+                c.arg("--");
                 c.arg("sh");
                 c.arg("-c");
                 c.arg(run_command);
@@ -663,9 +671,9 @@ pub fn kill_all_terminals() -> usize {
 mod tests {
     #[cfg(unix)]
     use super::build_unix_shell_command;
-    use super::{effective_pty_size, is_windows_batch_file};
+    use super::{effective_pty_size, is_windows_batch_file, wsl_exec_args};
     #[cfg(unix)]
-    use super::{terminal_utf8_locale_overrides, wsl_command_words, ParentLocale};
+    use super::{terminal_utf8_locale_overrides, ParentLocale};
 
     #[test]
     fn interrupt_and_suspend_bytes_are_recognized() {
@@ -686,48 +694,35 @@ mod tests {
         assert_eq!(effective_pty_size(100, 40, true), (100, 40));
     }
 
-    #[cfg(unix)]
     #[test]
-    fn wsl_command_words_survive_shell_reparse() {
-        // wsl.exe joins the words after `--` and hands them to the default
-        // shell; reproduce that re-parse and check every argument arrives
-        // intact, with the Windows context file path translated.
+    fn wsl_exec_args_bypass_shell_reparse_and_translate_paths() {
         let args = vec![
             "--append-system-prompt-file".to_string(),
-            r"C:\Users\alice\AppData\Roaming\com.jean.desktop\combined-contexts\s-terminal-context.md"
+            r"C:\Users\John Smith\AppData\Roaming\com.jean.desktop\combined-contexts\s-terminal-context.md"
                 .to_string(),
             "--config".to_string(),
             "base_instructions=\"Run `ls > out` and $(date)\"".to_string(),
-            "it's-safe".to_string(),
         ];
-        let script = std::iter::once("printf '%s\\n'".to_string())
-            .chain(
-                wsl_command_words("/usr/bin/claude", &args)
-                    .into_iter()
-                    .skip(1),
-            )
-            .collect::<Vec<_>>()
-            .join(" ");
-        let output = std::process::Command::new("sh")
-            .args(["-c", &script])
-            .output()
-            .expect("run sh");
-        let stdout = String::from_utf8(output.stdout).unwrap();
-        let received: Vec<&str> = stdout.lines().collect();
 
         assert_eq!(
-            received,
+            wsl_exec_args("Ubuntu-24.04", r"C:\repos\jean", "/usr/bin/claude", &args),
             [
+                "-d",
+                "Ubuntu-24.04",
+                "--cd",
+                "/mnt/c/repos/jean",
+                // Exec mode: wsl.exe splits argv itself instead of `$SHELL -c`.
+                "--exec",
+                "bash",
+                "-lc",
+                "exec \"$@\"",
+                "jean-cli",
+                "/usr/bin/claude",
                 "--append-system-prompt-file",
-                "/mnt/c/Users/alice/AppData/Roaming/com.jean.desktop/combined-contexts/s-terminal-context.md",
+                "/mnt/c/Users/John Smith/AppData/Roaming/com.jean.desktop/combined-contexts/s-terminal-context.md",
                 "--config",
                 "base_instructions=\"Run `ls > out` and $(date)\"",
-                "it's-safe",
             ]
-        );
-        assert_eq!(
-            wsl_command_words("/usr/bin/claude", &[])[0],
-            "'/usr/bin/claude'"
         );
     }
 
