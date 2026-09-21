@@ -58,7 +58,7 @@ describe('RecentWorktreesList structure', () => {
 
   it('uses fully rounded rows and a full background for the current row', () => {
     expect(source).toContain('className="flex flex-col gap-2 px-2 py-2"')
-    expect(source).toContain('rounded-lg border px-3 py-2.5')
+    expect(source).toContain('rounded-lg border py-2.5 pl-3 pr-9')
     expect(source).toContain(
       "isCurrent ? 'border-border bg-muted/50 text-foreground shadow'"
     )
@@ -117,11 +117,15 @@ describe('RecentWorktreesList structure', () => {
     expect(source).not.toContain('Updating…')
   })
 
-  it('pins sessions above recent rows and keeps the pin action hover-only', () => {
+  it('pins sessions above recent rows and keeps the pin visible on small screens', () => {
     expect(source).toContain('toggleRecentSessionPinned(row.session.id)')
     expect(source).toContain('pinned.has(row.session.id)')
     expect(source).toContain('aPinned === bPinned ? 0 : aPinned ? -1 : 1')
-    expect(source).toContain('group-hover:opacity-100')
+    expect(source).toContain('opacity-100')
+    expect(source).toContain('md:opacity-0')
+    expect(source).toContain('md:group-hover:opacity-100')
+    expect(source).toContain('pr-9')
+    expect(source).toContain('md:pr-3')
     expect(source).toContain("isPinned ? 'Unpin session' : 'Pin session'")
     expect(source).toContain('!isPinned &&')
   })

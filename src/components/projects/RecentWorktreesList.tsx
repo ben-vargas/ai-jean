@@ -274,7 +274,7 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
                   type="button"
                   aria-current={isCurrent ? 'page' : undefined}
                   aria-label={`${row.session.name}, ${row.projectName}, ${row.worktree.name}, ${status.label}${isUnread ? ', unread' : ''}, ${activityLabel}`}
-                  className={`grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1 rounded-lg border px-3 py-2.5 text-left transition-[background-color,border-color,box-shadow,color] hover:bg-muted/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring ${isCurrent ? 'border-border bg-muted/50 text-foreground shadow' : 'border-transparent bg-transparent text-muted-foreground'}`}
+                  className={`grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1 rounded-lg border py-2.5 pl-3 pr-9 text-left transition-[background-color,border-color,box-shadow,color] hover:bg-muted/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:pr-3 ${isCurrent ? 'border-border bg-muted/50 text-foreground shadow' : 'border-transparent bg-transparent text-muted-foreground'}`}
                   onClick={() => handleOpen(row)}
                 >
                   <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
@@ -328,7 +328,7 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
                   type="button"
                   aria-label={isPinned ? 'Unpin session' : 'Pin session'}
                   title={isPinned ? 'Unpin session' : 'Pin session'}
-                  className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-md bg-background/90 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:opacity-100 group-focus-within:opacity-100"
+                  className="absolute right-1 top-1 z-10 flex size-6 items-center justify-center rounded-md bg-background/90 text-muted-foreground opacity-100 transition-opacity hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:opacity-0 md:focus-visible:opacity-100 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
                   onClick={() =>
                     useProjectsStore
                       .getState()
