@@ -75,6 +75,7 @@ import {
   shouldHydrateCompletedSessionFromBackend,
 } from '@/components/chat/hooks/completion-hydration'
 import {
+  STREAMING_FRAME_FALLBACK_MS,
   shouldThrottleStreamingFlush,
   streamingFlushDelayMs,
 } from '@/lib/streaming-flush'
@@ -510,6 +511,13 @@ export default function useStreamingEvents({
         }
       }
 
+      // Some webviews can stop animation frames while the process continues to
+      // receive backend events. Keep a timer fallback so live output cannot stay
+      // buffered until the user changes sessions.
+      chunkTimeoutId = setTimeout(() => {
+        chunkTimeoutId = null
+        flushChunkBuffer()
+      }, STREAMING_FRAME_FALLBACK_MS)
       chunkRafId = requestAnimationFrame(flushChunkBuffer)
     }
 
@@ -639,6 +647,10 @@ export default function useStreamingEvents({
         }
       }
 
+      thinkingTimeoutId = setTimeout(() => {
+        thinkingTimeoutId = null
+        flushThinkingBuffer()
+      }, STREAMING_FRAME_FALLBACK_MS)
       thinkingRafId = requestAnimationFrame(flushThinkingBuffer)
     }
 

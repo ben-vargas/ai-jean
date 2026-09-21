@@ -96,6 +96,38 @@ describe('useStreamingEvents sending mode sync', () => {
     })
   })
 
+  it('flushes live output when the webview does not run animation frames', async () => {
+    vi.stubGlobal(
+      'requestAnimationFrame',
+      vi.fn(() => 1)
+    )
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    const queryClient = createQueryClient()
+    renderHook(() => useStreamingEvents({ queryClient }), {
+      wrapper: createWrapper(queryClient),
+    })
+
+    await waitFor(() =>
+      expect(registeredListeners.has('chat:chunk')).toBe(true)
+    )
+
+    registeredListeners.get('chat:chunk')?.({
+      payload: {
+        session_id: 'session-1',
+        worktree_id: 'worktree-1',
+        content: 'Visible without changing sessions.',
+        run_id: 'run-1',
+      },
+    })
+
+    await waitFor(() =>
+      expect(useChatStore.getState().streamingContents['session-1']).toBe(
+        'Visible without changing sessions.'
+      )
+    )
+  })
+
   it('uses the execution mode of a turn started through Jean MCP', async () => {
     const queryClient = createQueryClient()
     renderHook(() => useStreamingEvents({ queryClient }), {
