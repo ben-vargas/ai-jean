@@ -70,6 +70,7 @@ import { openExternal } from '@/lib/platform'
 import { notify } from '@/lib/notifications'
 import { cn } from '@/lib/utils'
 import { toastActionLabel } from '@/lib/toast-action-label'
+import { parseServerResourceKey } from '@/lib/server-resource'
 import { toast } from 'sonner'
 import {
   gitPush,
@@ -494,7 +495,12 @@ export function MagicModal() {
   const isOnCanvas =
     !useChatStore(state => state.activeWorktreePath) && !sessionModalOpen
   const pickRemoteOrRun = useRemotePicker(worktree?.path)
-  const { installedBackends } = useInstalledBackends()
+  const targetServerId = selectedWorktreeId
+    ? parseServerResourceKey(selectedWorktreeId)?.serverId
+    : undefined
+  const { installedBackends } = useInstalledBackends({
+    serverId: targetServerId,
+  })
   const { data: availableOpencodeModels } = useAvailableOpencodeModels({
     enabled: installedBackends.includes('opencode'),
   })

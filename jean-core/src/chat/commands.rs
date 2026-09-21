@@ -2989,20 +2989,6 @@ pub async fn send_chat_message(
         }
     }
 
-    // Notify all clients that a message is being sent (for real-time sync).
-    // Include user_message so cross-client viewers can show it immediately
-    // without refetching (avoids race with optimistic updates).
-    if let Err(e) = app.emit_all(
-        "chat:sending",
-        &serde_json::json!({
-            "session_id": session_id,
-            "worktree_id": worktree_id,
-            "user_message": message,
-        }),
-    ) {
-        log::error!("Failed to emit chat:sending event: {e}");
-    }
-
     // Find the session
     let session = match sessions.find_session_mut(&session_id) {
         Some(s) => s,
@@ -3093,6 +3079,21 @@ pub async fn send_chat_message(
     log::info!(
         "[SendChat] resolved session={session_id} model={model:?} backend={effective_backend:?} execution_mode={execution_mode:?}"
     );
+
+    // Notify all clients only after resolving inherited session settings. This
+    // lets remote and MCP-started turns show the mode that is actually running
+    // instead of briefly falling back to plan mode.
+    if let Err(e) = app.emit_all(
+        "chat:sending",
+        &serde_json::json!({
+            "session_id": session_id,
+            "worktree_id": worktree_id,
+            "user_message": message,
+            "execution_mode": execution_mode,
+        }),
+    ) {
+        log::error!("Failed to emit chat:sending event: {e}");
+    }
 
     // Sync session.backend when model-based resolution overrides it
     // (e.g. user switched from Claude model to Codex model mid-session).

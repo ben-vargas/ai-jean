@@ -12,6 +12,7 @@ describe('ProjectsStore', () => {
       projectCanvasActiveFilters: {},
       sidebarServerFilter: null,
       sidebarActiveTab: 'projects',
+      pinnedRecentSessionIds: [],
       githubDashboardFavoriteProjectIds: [],
       addProjectDialogOpen: false,
       projectSettingsDialogOpen: false,
@@ -253,6 +254,18 @@ describe('ProjectsStore', () => {
       useProjectsStore.getState().setSidebarActiveTab('recent')
 
       expect(useProjectsStore.getState().sidebarActiveTab).toBe('recent')
+    })
+
+    it('pins and unpins a recent session', () => {
+      const { toggleRecentSessionPinned } = useProjectsStore.getState()
+
+      toggleRecentSessionPinned('session-1')
+      expect(useProjectsStore.getState().pinnedRecentSessionIds).toEqual([
+        'session-1',
+      ])
+
+      toggleRecentSessionPinned('session-1')
+      expect(useProjectsStore.getState().pinnedRecentSessionIds).toEqual([])
     })
 
     it('stores worktree sort mode per project', () => {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { AlertTriangle, BellDot, Plus } from '@/components/icons/reicon'
+import { AlertTriangle, BellDot, Pin, Plus } from '@/components/icons/reicon'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useChatStore } from '@/store/chat-store'
 import { useProjectsStore } from '@/store/projects-store'
@@ -72,6 +72,9 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
     state => state.waitingForInputSessionIds
   )
   const namingSessionIds = useChatStore(state => state.namingSessionIds)
+  const pinnedSessionIds = useProjectsStore(
+    state => state.pinnedRecentSessionIds
+  )
   const [limit, setLimit] = useState(INITIAL_RECENT_LIMIT)
   const [showSnoozed, setShowSnoozed] = useState(false)
   const rowRefs = useRef(new Map<string, HTMLButtonElement>())
@@ -103,9 +106,21 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
   const snoozedBoundaryLoaded = rows
     .slice(0, limit)
     .some(row => isSnoozedSession(row.lastActivityAt))
-  const displayedRows = showSnoozed
-    ? rows
-    : rows.filter(row => !isSnoozedSession(row.lastActivityAt))
+  const displayedRows = useMemo(() => {
+    const pinned = new Set(pinnedSessionIds)
+    return rows
+      .filter(
+        row =>
+          showSnoozed ||
+          pinned.has(row.session.id) ||
+          !isSnoozedSession(row.lastActivityAt)
+      )
+      .sort((a, b) => {
+        const aPinned = pinned.has(a.session.id)
+        const bPinned = pinned.has(b.session.id)
+        return aPinned === bPinned ? 0 : aPinned ? -1 : 1
+      })
+  }, [pinnedSessionIds, rows, showSnoozed])
   const recentProjectKey = useMemo(
     () => [...new Set(rows.map(row => row.projectId))].sort().join('\0'),
     [rows]
@@ -234,11 +249,16 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
                   : 'text-muted-foreground'
             const isWorking = status.tone === 'working'
             const isUnread = isUnreadSession(row.session)
+            const isPinned = pinnedSessionIds.includes(row.session.id)
             return (
-              <li key={row.session.id}>
+              <li key={row.session.id} className="group relative">
                 {showSnoozed &&
+                  !isPinned &&
                   isSnoozedSession(row.lastActivityAt) &&
                   (index === 0 ||
+                    pinnedSessionIds.includes(
+                      displayedRows[index - 1]?.session.id ?? ''
+                    ) ||
                     !isSnoozedSession(
                       displayedRows[index - 1]?.lastActivityAt ?? 0
                     )) && (
@@ -301,6 +321,21 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
                       <span className="text-red-500">-{row.removed}</span>
                     </span>
                   )}
+                </button>
+                <button
+                  type="button"
+                  aria-label={isPinned ? 'Unpin session' : 'Pin session'}
+                  title={isPinned ? 'Unpin session' : 'Pin session'}
+                  className="absolute right-1 top-1 flex size-6 items-center justify-center rounded-md bg-background/90 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring group-hover:opacity-100 group-focus-within:opacity-100"
+                  onClick={() =>
+                    useProjectsStore
+                      .getState()
+                      .toggleRecentSessionPinned(row.session.id)
+                  }
+                >
+                  <Pin
+                    className={`size-3.5 ${isPinned ? 'fill-current' : ''}`}
+                  />
                 </button>
               </li>
             )

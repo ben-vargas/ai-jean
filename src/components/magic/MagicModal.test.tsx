@@ -40,6 +40,8 @@ const mocks = vi.hoisted(() => {
     gitPush: vi.fn(),
     openExternal: vi.fn(),
     activeWorktreePath: null as string | null,
+    selectedWorktreeId: 'wt-1',
+    installedBackendsOptions: vi.fn(),
     worktreePaths: {} as Record<string, string>,
     worktree,
   }
@@ -99,7 +101,7 @@ vi.mock('@/store/projects-store', () => ({
   useProjectsStore: Object.assign(
     (selector?: (state: ProjectsState) => unknown) => {
       const state: ProjectsState = {
-        selectedWorktreeId: 'wt-1',
+        selectedWorktreeId: mocks.selectedWorktreeId,
         selectedProjectId: 'project-1',
       }
       return selector ? selector(state) : state
@@ -208,7 +210,10 @@ vi.mock('@/services/opencode-cli', () => ({
 }))
 
 vi.mock('@/hooks/useInstalledBackends', () => ({
-  useInstalledBackends: () => ({ installedBackends: ['claude'] }),
+  useInstalledBackends: (options?: { serverId?: string }) => {
+    mocks.installedBackendsOptions(options)
+    return { installedBackends: ['claude'] }
+  },
 }))
 
 vi.mock('@/hooks/useRemotePicker', () => ({
@@ -268,6 +273,7 @@ describe('MagicModal manual PR link', () => {
     mocks.worktree.pr_number = null
     mocks.worktree.pr_url = null
     mocks.activeWorktreePath = null
+    mocks.selectedWorktreeId = 'wt-1'
     mocks.invokeMock.mockImplementation((command: string) => {
       if (command === 'detect_and_link_pr') return Promise.resolve(null)
       if (command === 'link_worktree_pr') {
@@ -278,6 +284,16 @@ describe('MagicModal manual PR link', () => {
         })
       }
       return Promise.resolve(null)
+    })
+  })
+
+  it('checks installed backends on the selected worktree server', () => {
+    mocks.selectedWorktreeId = 'remote-1:wt-1'
+
+    render(<MagicModal />)
+
+    expect(mocks.installedBackendsOptions).toHaveBeenCalledWith({
+      serverId: 'remote-1',
     })
   })
 

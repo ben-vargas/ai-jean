@@ -36,6 +36,7 @@ interface ProjectsUIState {
   projectCanvasActiveFilters: Record<string, string>
   sidebarServerFilter: string | null
   sidebarActiveTab: SidebarTab
+  pinnedRecentSessionIds: string[]
 
   // Favorited projects shown first in the GitHub Dashboard filter and sections
   githubDashboardFavoriteProjectIds: string[]
@@ -123,6 +124,8 @@ interface ProjectsUIState {
   setProjectCanvasLabels: (projectId: string, labels: LabelData[]) => void
   setProjectCanvasActiveFilter: (projectId: string, filter: string) => void
   setSidebarServerFilter: (serverId: string | null) => void
+  setPinnedRecentSessionIds: (sessionIds: string[]) => void
+  toggleRecentSessionPinned: (sessionId: string) => void
   setGitHubDashboardFavoriteProjectIds: (projectIds: string[]) => void
   toggleGitHubDashboardFavoriteProject: (projectId: string) => void
 }
@@ -142,6 +145,7 @@ export const useProjectsStore = create<ProjectsUIState>()(
       projectCanvasActiveFilters: {},
       sidebarServerFilter: null,
       sidebarActiveTab: 'projects',
+      pinnedRecentSessionIds: [],
       githubDashboardFavoriteProjectIds: [],
       addProjectDialogOpen: false,
       addProjectParentFolderId: null,
@@ -407,6 +411,30 @@ export const useProjectsStore = create<ProjectsUIState>()(
             state.sidebarActiveTab === tab ? state : { sidebarActiveTab: tab },
           undefined,
           'setSidebarActiveTab'
+        ),
+
+      setPinnedRecentSessionIds: sessionIds =>
+        set(
+          state =>
+            JSON.stringify(state.pinnedRecentSessionIds) ===
+            JSON.stringify(sessionIds)
+              ? state
+              : { pinnedRecentSessionIds: sessionIds },
+          undefined,
+          'setPinnedRecentSessionIds'
+        ),
+
+      toggleRecentSessionPinned: sessionId =>
+        set(
+          state => ({
+            pinnedRecentSessionIds: state.pinnedRecentSessionIds.includes(
+              sessionId
+            )
+              ? state.pinnedRecentSessionIds.filter(id => id !== sessionId)
+              : [...state.pinnedRecentSessionIds, sessionId],
+          }),
+          undefined,
+          'toggleRecentSessionPinned'
         ),
 
       setGitHubDashboardFavoriteProjectIds: projectIds =>

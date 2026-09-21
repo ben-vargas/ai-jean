@@ -36,6 +36,7 @@ const RATE_LIMITED_TOOLS: &[&str] = &[
     "delete_worktree",
     "import_worktree",
     "init_project",
+    "link_worktree_pr",
     "merge_pull_request",
     "move_session",
     "permanently_delete_worktree",
@@ -47,6 +48,7 @@ const RATE_LIMITED_TOOLS: &[&str] = &[
     "start_run_environment",
     "unarchive_session",
     "unarchive_worktree",
+    "unlink_worktree_pr",
 ];
 const DEFAULT_MCP_DIFF_MAX_BYTES: usize = 60_000;
 const MAX_MCP_DIFF_BYTES: usize = 200_000;
@@ -242,7 +244,7 @@ fn tool_registry_core() -> Value {
 fn tool_registry_session() -> Value {
     json!([
         {"name":"list_sessions","description":"List chat sessions in a worktree without loading full message history. Use before creating a session to avoid duplicates.","inputSchema":{"type":"object","properties":{"worktreeId":{"type":"string"},"includeArchived":{"type":"boolean","default":false}},"required":["worktreeId"],"additionalProperties":false}},
-        {"name":"create_session","description":"Create a new chat session in an existing non-archived worktree. Returns the session id needed for send_chat_message. Fails if the worktree is archived — call unarchive_worktree first.","inputSchema":{"type":"object","properties":{"worktreeId":{"type":"string"},"name":{"type":"string"},"backend":{"type":"string","enum":["claude","codex","cursor","opencode","pi","commandcode","grok","kimi","antigravity"]}},"required":["worktreeId"],"additionalProperties":false}},
+        {"name":"create_session","description":"Get a chat session for a prompt in an existing non-archived worktree. Reuses an empty chat session when one is available; otherwise creates a new session. Returns the session id needed for send_chat_message. Fails if the worktree is archived — call unarchive_worktree first.","inputSchema":{"type":"object","properties":{"worktreeId":{"type":"string"},"name":{"type":"string"},"backend":{"type":"string","enum":["claude","codex","cursor","opencode","pi","commandcode","grok","kimi","antigravity"]}},"required":["worktreeId"],"additionalProperties":false}},
         {"name":"send_chat_message","description":"Send a message to an existing non-archived session. Fire-and-forget: returns immediately as the session begins processing; poll get_session_status with the returned sessionId for completion or failure. Omitted settings inherit the session selections. Supplied settings override one turn only.","inputSchema":{"type":"object","properties":{"sessionId":{"type":"string"},"message":{"type":"string"},"model":{"type":"string"},"backend":{"type":"string","enum":["claude","codex","cursor","opencode","pi","commandcode","grok","kimi","antigravity"]},"customProfileName":{"type":"string","description":"Optional one-turn provider/profile override."},"effortLevel":{"type":"string","enum":["off","adaptive","minimal","low","medium","high","xhigh","max","ultracode"]},"thinkingLevel":{"type":"string","enum":["off","adaptive","think","megathink","ultrathink"]},"executionMode":{"type":"string","enum":["plan","build","yolo"]}},"required":["sessionId","message"],"additionalProperties":false}},
         {"name":"archive_session","description":"Archive a chat session (hide it from the active session list). Prefer this over delete when history may still be useful. Cannot run send_chat_message on an archived session until unarchive_session is called.","inputSchema":{"type":"object","properties":{"sessionId":{"type":"string"}},"required":["sessionId"],"additionalProperties":false}},
         {"name":"unarchive_session","description":"Restore an archived chat session so it can run again. Also unarchives the parent worktree when it is archived. Call this before send_chat_message if a previous attempt failed because the session was archived.","inputSchema":{"type":"object","properties":{"sessionId":{"type":"string"}},"required":["sessionId"],"additionalProperties":false}},
@@ -267,6 +269,8 @@ fn tool_registry_ship_loop() -> Value {
         {"name":"create_commit","description":"Stage changes and create a git commit with an AI-generated message (same path as Jean UI Commit). Optional push after commit. Use specificFiles to stage only some paths; omit to stage all. Returns commitHash, message, pushed flags.","inputSchema":{"type":"object","properties":{"worktreeId":{"type":"string"},"push":{"type":"boolean","default":false,"description":"Push after a successful commit (or push existing unpushed commits when there is nothing new to commit)."},"remote":{"type":"string","description":"Optional git remote name for push."},"prNumber":{"type":"integer","minimum":1,"description":"Optional linked PR number for PR-aware push (fork remotes / force-with-lease)."},"specificFiles":{"type":"array","items":{"type":"string"},"description":"Optional list of paths to stage instead of staging everything."},"customPrompt":{"type":"string","description":"Optional override for the commit-message magic prompt."},"model":{"type":"string"},"reasoningEffort":{"type":"string"}},"required":["worktreeId"],"additionalProperties":false}},
         {"name":"push_worktree","description":"Push the current branch for a worktree (same path as Jean UI push). Optionally pass prNumber for PR-aware push.","inputSchema":{"type":"object","properties":{"worktreeId":{"type":"string"},"remote":{"type":"string","description":"Optional git remote name."},"prNumber":{"type":"integer","minimum":1,"description":"Optional PR number for PR-aware push."}},"required":["worktreeId"],"additionalProperties":false}},
         {"name":"detect_open_pr","description":"Detect whether the worktree's current branch already has an open GitHub PR. Returns the PR (number, url, title) or null when none exists. Call before create_pull_request to avoid duplicates.","inputSchema":{"type":"object","properties":{"worktreeId":{"type":"string"}},"required":["worktreeId"],"additionalProperties":false}},
+        {"name":"link_worktree_pr","description":"Validate and link an existing GitHub PR to a Jean worktree by exact PR number. Jean resolves the repository from worktreeId and persists the PR number and URL.","inputSchema":{"type":"object","properties":{"worktreeId":{"type":"string"},"prNumber":{"type":"integer","minimum":1}},"required":["worktreeId","prNumber"],"additionalProperties":false}},
+        {"name":"unlink_worktree_pr","description":"Remove the persisted GitHub PR link from a Jean worktree. This does not close or modify the PR on GitHub.","inputSchema":{"type":"object","properties":{"worktreeId":{"type":"string"}},"required":["worktreeId"],"additionalProperties":false}},
         {"name":"create_pull_request","description":"Create a GitHub PR for the worktree with AI-generated title/body (same path as Jean UI Open PR). Stages and commits uncommitted changes when needed, pushes the branch, and opens the PR against the project default branch. Returns prNumber, prUrl, title, existing. Prefer detect_open_pr first when unsure.","inputSchema":{"type":"object","properties":{"worktreeId":{"type":"string"},"sessionId":{"type":"string","description":"Optional Jean session id for context when generating PR content."},"customPrompt":{"type":"string","description":"Optional override for the PR-content magic prompt."},"model":{"type":"string"},"reasoningEffort":{"type":"string"}},"required":["worktreeId"],"additionalProperties":false}},
         {"name":"merge_pull_request","description":"Merge the open GitHub PR for the worktree's current branch using gh (same path as Jean UI merge). Uses the repo-allowed merge method (prefers squash). Fails if there is no open mergeable PR.","inputSchema":{"type":"object","properties":{"worktreeId":{"type":"string"}},"required":["worktreeId"],"additionalProperties":false}},
         {"name":"run_review","description":"Run Jean's AI code review on the worktree branch (same path as Jean UI Review). Returns summary, findings, and approvalStatus. Does not commit or open a PR.","inputSchema":{"type":"object","properties":{"worktreeId":{"type":"string"},"customPrompt":{"type":"string","description":"Optional override for the review magic prompt."},"model":{"type":"string"},"backend":{"type":"string","description":"Optional magic-prompt backend override (e.g. claude, codex)."},"reasoningEffort":{"type":"string"}},"required":["worktreeId"],"additionalProperties":false}}
@@ -865,6 +869,64 @@ async fn run_tool(
             // Fail fast when the worktree is archived (also enforced in create_session).
             ensure_mcp_worktree_not_archived(app, &worktree_id)?;
             let worktree_path = resolve_worktree_path(app, &worktree_id)?;
+            let sessions = crate::chat::get_sessions(
+                app.clone(),
+                worktree_id.clone(),
+                worktree_path.clone(),
+                None,
+                Some(true),
+            )
+            .await
+            .map_err(ToolError::internal)?;
+            if let Some(session) = select_reusable_empty_mcp_session(&sessions, |session| {
+                !crate::chat::registry::is_session_actively_managed(&session.id)
+                    && crate::chat::storage::load_metadata(app, &session.id)
+                        .ok()
+                        .flatten()
+                        .is_some_and(|metadata| metadata.runs.is_empty())
+            }) {
+                let session_id = session.id.clone();
+                if let Some(name) = args.get("name").and_then(Value::as_str) {
+                    dispatch_command(
+                        app,
+                        "rename_session",
+                        json!({
+                            "worktreeId": worktree_id.clone(),
+                            "worktreePath": worktree_path.clone(),
+                            "sessionId": session_id.clone(),
+                            "newName": name,
+                        }),
+                    )
+                    .await
+                    .map_err(ToolError::internal)?;
+                }
+                if let Some(backend) = args.get("backend").and_then(Value::as_str) {
+                    let backend = normalize_backend_name(backend)?;
+                    dispatch_command(
+                        app,
+                        "set_session_backend",
+                        json!({
+                            "worktreeId": worktree_id.clone(),
+                            "worktreePath": worktree_path.clone(),
+                            "sessionId": session_id.clone(),
+                            "backend": backend,
+                        }),
+                    )
+                    .await
+                    .map_err(ToolError::internal)?;
+                }
+                return dispatch_command(
+                    app,
+                    "get_session",
+                    json!({
+                        "worktreeId": worktree_id,
+                        "worktreePath": worktree_path,
+                        "sessionId": session_id,
+                    }),
+                )
+                .await
+                .map_err(ToolError::internal);
+            }
             let mut payload = serde_json::Map::new();
             payload.insert("worktreeId".to_string(), Value::String(worktree_id));
             payload.insert("worktreePath".to_string(), Value::String(worktree_path));
@@ -1467,6 +1529,9 @@ async fn run_tool(
         }
         "detect_open_pr" => {
             let worktree_id = require_str(&args, "worktreeId")?;
+            if is_mcp_base_worktree(app, &worktree_id)? {
+                return Ok(Value::Null);
+            }
             let worktree_path = resolve_worktree_path(app, &worktree_id)?;
             dispatch_command(
                 app,
@@ -1476,9 +1541,43 @@ async fn run_tool(
             .await
             .map_err(ToolError::internal)
         }
-        "create_pull_request" => {
+        "link_worktree_pr" => {
+            let worktree_id = require_str(&args, "worktreeId")?;
+            ensure_mcp_worktree_can_link_pr(app, &worktree_id)?;
+            let pr_number = args
+                .get("prNumber")
+                .or_else(|| args.get("pr_number"))
+                .and_then(Value::as_u64)
+                .and_then(|number| u32::try_from(number).ok())
+                .filter(|number| *number > 0)
+                .ok_or_else(|| ToolError::invalid_params("missing or invalid 'prNumber'"))?;
+            let worktree_path = resolve_worktree_path(app, &worktree_id)?;
+            dispatch_command(
+                app,
+                "link_worktree_pr",
+                json!({
+                    "worktreeId": worktree_id,
+                    "worktreePath": worktree_path,
+                    "prNumber": pr_number,
+                }),
+            )
+            .await
+            .map_err(ToolError::internal)
+        }
+        "unlink_worktree_pr" => {
             let worktree_id = require_str(&args, "worktreeId")?;
             ensure_mcp_worktree_not_archived(app, &worktree_id)?;
+            dispatch_command(
+                app,
+                "clear_worktree_pr",
+                json!({ "worktreeId": worktree_id }),
+            )
+            .await
+            .map_err(ToolError::internal)
+        }
+        "create_pull_request" => {
+            let worktree_id = require_str(&args, "worktreeId")?;
+            ensure_mcp_worktree_can_link_pr(app, &worktree_id)?;
             let worktree_path = resolve_worktree_path(app, &worktree_id)?;
             let session_id =
                 optional_str(&args, "sessionId").or_else(|| optional_str(&args, "session_id"));
@@ -1501,9 +1600,30 @@ async fn run_tool(
             if let Some(effort) = reasoning_effort {
                 payload.insert("reasoningEffort".to_string(), Value::String(effort));
             }
-            dispatch_command(app, "create_pr_with_ai_content", Value::Object(payload))
+            let result = dispatch_command(app, "create_pr_with_ai_content", Value::Object(payload))
                 .await
-                .map_err(ToolError::internal)
+                .map_err(ToolError::internal)?;
+            let pr_number = result
+                .get("pr_number")
+                .and_then(Value::as_u64)
+                .and_then(|number| u32::try_from(number).ok())
+                .ok_or_else(|| ToolError::internal("PR result is missing pr_number"))?;
+            let pr_url = result
+                .get("pr_url")
+                .and_then(Value::as_str)
+                .ok_or_else(|| ToolError::internal("PR result is missing pr_url"))?;
+            dispatch_command(
+                app,
+                "save_worktree_pr",
+                json!({
+                    "worktreeId": worktree_id,
+                    "prNumber": pr_number,
+                    "prUrl": pr_url,
+                }),
+            )
+            .await
+            .map_err(ToolError::internal)?;
+            Ok(result)
         }
         "merge_pull_request" => {
             let worktree_id = require_str(&args, "worktreeId")?;
@@ -1693,6 +1813,30 @@ async fn run_tool(
         }
         other => Err(ToolError::invalid_params(format!("Unknown tool: {other}"))),
     }
+}
+
+fn select_reusable_empty_mcp_session<'a>(
+    sessions: &'a crate::chat::types::WorktreeSessions,
+    additional_check: impl Fn(&crate::chat::types::Session) -> bool,
+) -> Option<&'a crate::chat::types::Session> {
+    let is_reusable = |session: &&crate::chat::types::Session| {
+        session.archived_at.is_none()
+            && session.primary_surface.as_deref() != Some("terminal")
+            && session.message_count == Some(0)
+            && session.queued_messages.is_empty()
+            && additional_check(session)
+    };
+
+    sessions
+        .active_session_id
+        .as_deref()
+        .and_then(|active_id| {
+            sessions
+                .sessions
+                .iter()
+                .find(|session| session.id == active_id && is_reusable(session))
+        })
+        .or_else(|| sessions.sessions.iter().find(is_reusable))
 }
 
 fn deletion_started_result(worktree_id: &str, action: &str) -> Value {
@@ -2775,6 +2919,25 @@ fn ensure_mcp_worktree_not_archived(app: &AppHandle, worktree_id: &str) -> Resul
     .map_err(ToolError::invalid_params)
 }
 
+fn is_mcp_base_worktree(app: &AppHandle, worktree_id: &str) -> Result<bool, ToolError> {
+    let data = crate::projects::storage::load_projects_data(app)
+        .map_err(|e| ToolError::internal(format!("load_projects_data: {e}")))?;
+    let worktree = data
+        .find_worktree(worktree_id)
+        .ok_or_else(|| ToolError::invalid_params(format!("Unknown worktreeId: {worktree_id}")))?;
+    Ok(worktree.session_type == crate::projects::types::SessionType::Base)
+}
+
+fn ensure_mcp_worktree_can_link_pr(app: &AppHandle, worktree_id: &str) -> Result<(), ToolError> {
+    ensure_mcp_worktree_not_archived(app, worktree_id)?;
+    if is_mcp_base_worktree(app, worktree_id)? {
+        return Err(ToolError::invalid_params(
+            "Base worktrees cannot be linked to pull requests",
+        ));
+    }
+    Ok(())
+}
+
 /// Reject MCP send_chat_message when the session or its worktree is archived.
 fn ensure_mcp_session_can_run(
     app: &AppHandle,
@@ -3072,6 +3235,47 @@ mod tests {
         });
 
         assert!(has_pr_list);
+    }
+
+    #[test]
+    fn empty_mcp_session_selection_prefers_active_chat_session() {
+        let mut first = crate::chat::types::Session::default_session();
+        first.id = "first".to_string();
+        first.message_count = Some(0);
+        let mut active = crate::chat::types::Session::default_session();
+        active.id = "active".to_string();
+        active.message_count = Some(0);
+        let sessions = crate::chat::types::WorktreeSessions {
+            sessions: vec![first, active],
+            active_session_id: Some("active".to_string()),
+            ..Default::default()
+        };
+
+        let selected = select_reusable_empty_mcp_session(&sessions, |_| true);
+        assert_eq!(selected.map(|session| session.id.as_str()), Some("active"));
+    }
+
+    #[test]
+    fn empty_mcp_session_selection_rejects_used_terminal_or_ineligible_sessions() {
+        let mut used = crate::chat::types::Session::default_session();
+        used.id = "used".to_string();
+        used.message_count = Some(1);
+        let mut terminal = crate::chat::types::Session::default_session();
+        terminal.id = "terminal".to_string();
+        terminal.message_count = Some(0);
+        terminal.primary_surface = Some("terminal".to_string());
+        let mut running = crate::chat::types::Session::default_session();
+        running.id = "running".to_string();
+        running.message_count = Some(0);
+        let sessions = crate::chat::types::WorktreeSessions {
+            sessions: vec![used, terminal, running],
+            active_session_id: Some("used".to_string()),
+            ..Default::default()
+        };
+
+        let selected =
+            select_reusable_empty_mcp_session(&sessions, |session| session.id != "running");
+        assert!(selected.is_none());
     }
 
     #[test]
@@ -3392,6 +3596,8 @@ mod tests {
             "create_commit",
             "push_worktree",
             "detect_open_pr",
+            "link_worktree_pr",
+            "unlink_worktree_pr",
             "create_pull_request",
             "merge_pull_request",
             "run_review",
@@ -3415,12 +3621,27 @@ mod tests {
             .get("sessionId")
             .is_some());
 
+        let link_pr = find_tool(&tools, "link_worktree_pr");
+        assert_eq!(
+            link_pr["inputSchema"]["required"],
+            json!(["worktreeId", "prNumber"])
+        );
+        assert_eq!(
+            link_pr["inputSchema"]["properties"]["prNumber"]["minimum"],
+            1
+        );
+
+        let unlink_pr = find_tool(&tools, "unlink_worktree_pr");
+        assert_eq!(unlink_pr["inputSchema"]["required"], json!(["worktreeId"]));
+
         for limited in [
             "create_commit",
             "create_pull_request",
+            "link_worktree_pr",
             "merge_pull_request",
             "push_worktree",
             "run_review",
+            "unlink_worktree_pr",
         ] {
             assert!(
                 RATE_LIMITED_TOOLS.contains(&limited),

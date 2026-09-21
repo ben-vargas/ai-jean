@@ -41,6 +41,7 @@ describe('client view state', () => {
       },
       sidebar_server_filter: 'server-a',
       sidebar_active_tab: 'recent' as const,
+      pinned_recent_session_ids: ['server-a:session-1'],
       left_sidebar_visible: true,
       left_sidebar_size: 320,
       file_browser_visible: true,

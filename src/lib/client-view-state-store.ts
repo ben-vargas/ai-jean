@@ -39,6 +39,7 @@ export function captureClientViewState(): ClientViewState {
       projects.githubDashboardFavoriteProjectIds,
     sidebar_server_filter: projects.sidebarServerFilter,
     sidebar_active_tab: projects.sidebarActiveTab,
+    pinned_recent_session_ids: projects.pinnedRecentSessionIds,
     left_sidebar_visible: ui.leftSidebarVisible,
     left_sidebar_size: ui.leftSidebarSize,
     file_browser_visible: ui.fileBrowserVisible,
@@ -89,6 +90,7 @@ export function applyClientViewState(state: ClientViewState): void {
       state.github_dashboard_favorite_project_ids,
     sidebarServerFilter: state.sidebar_server_filter,
     sidebarActiveTab: state.sidebar_active_tab,
+    pinnedRecentSessionIds: state.pinned_recent_session_ids,
   })
   useUIStore.setState({
     leftSidebarVisible: state.left_sidebar_visible,

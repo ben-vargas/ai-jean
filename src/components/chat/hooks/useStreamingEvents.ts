@@ -367,8 +367,14 @@ export default function useStreamingEvents({
       session_id: string
       worktree_id: string
       user_message: string
+      execution_mode?: 'plan' | 'build' | 'yolo'
     }>('chat:sending', event => {
-      const { session_id, worktree_id: wtId, user_message } = event.payload
+      const {
+        session_id,
+        worktree_id: wtId,
+        user_message,
+        execution_mode,
+      } = event.payload
       cancelledUntaggedSessionIds.delete(session_id)
       // Check if THIS client initiated the send (sender calls addSendingSession
       // before sendMessage.mutate, so it's already in sendingSessionIds).
@@ -390,6 +396,9 @@ export default function useStreamingEvents({
         return { waitingForInputSessionIds, reviewingSessions }
       })
       addSendingSession(session_id)
+      if (execution_mode) {
+        useChatStore.getState().setExecutingMode(session_id, execution_mode)
+      }
       queryClient.setQueryData<Session>(
         chatQueryKeys.session(session_id),
         old =>
@@ -400,6 +409,8 @@ export default function useStreamingEvents({
                 waiting_for_input_type: null,
                 is_reviewing: false,
                 last_run_status: 'running',
+                last_run_execution_mode:
+                  execution_mode ?? old.last_run_execution_mode,
               }
             : old
       )

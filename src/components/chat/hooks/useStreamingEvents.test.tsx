@@ -85,6 +85,42 @@ function setupListenMock() {
   )
 }
 
+describe('useStreamingEvents sending mode sync', () => {
+  beforeEach(() => {
+    setupListenMock()
+    useChatStore.setState({
+      sendingSessionIds: {},
+      executingModes: {},
+      waitingForInputSessionIds: {},
+      reviewingSessions: {},
+    })
+  })
+
+  it('uses the execution mode of a turn started through Jean MCP', async () => {
+    const queryClient = createQueryClient()
+    renderHook(() => useStreamingEvents({ queryClient }), {
+      wrapper: createWrapper(queryClient),
+    })
+
+    await waitFor(() =>
+      expect(registeredListeners.has('chat:sending')).toBe(true)
+    )
+
+    registeredListeners.get('chat:sending')?.({
+      payload: {
+        session_id: 'session-1',
+        worktree_id: 'worktree-1',
+        user_message: 'run this now',
+        execution_mode: 'yolo',
+      },
+    })
+
+    const state = useChatStore.getState()
+    expect(state.sendingSessionIds['session-1']).toBe(true)
+    expect(state.executingModes['session-1']).toBe('yolo')
+  })
+})
+
 describe('useStreamingEvents Codex MCP elicitation', () => {
   beforeEach(() => {
     setupListenMock()

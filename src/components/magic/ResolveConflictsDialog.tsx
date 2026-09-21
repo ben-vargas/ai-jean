@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { parseServerResourceKey } from '@/lib/server-resource'
 import { useChatStore } from '@/store/chat-store'
 import { useProjectsStore } from '@/store/projects-store'
 import { useUIStore } from '@/store/ui-store'
@@ -91,7 +92,12 @@ export function ResolveConflictsDialog({
   const project = worktree
     ? projects?.find(p => p.id === worktree.project_id)
     : null
-  const { installedBackends } = useInstalledBackends()
+  const targetServerId = selectedWorktreeId
+    ? parseServerResourceKey(selectedWorktreeId)?.serverId
+    : undefined
+  const { installedBackends } = useInstalledBackends({
+    serverId: targetServerId,
+  })
   const { data: availableOpencodeModels } = useAvailableOpencodeModels({
     enabled: installedBackends.includes('opencode'),
   })

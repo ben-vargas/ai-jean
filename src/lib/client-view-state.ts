@@ -20,6 +20,7 @@ export interface ClientViewState {
   github_dashboard_favorite_project_ids: string[]
   sidebar_server_filter: string | null
   sidebar_active_tab: 'projects' | 'recent'
+  pinned_recent_session_ids: string[]
   left_sidebar_visible: boolean
   left_sidebar_size: number
   file_browser_visible: boolean
@@ -56,6 +57,7 @@ export const defaultClientViewState: ClientViewState = {
   github_dashboard_favorite_project_ids: [],
   sidebar_server_filter: null,
   sidebar_active_tab: 'projects',
+  pinned_recent_session_ids: [],
   left_sidebar_visible: false,
   left_sidebar_size: 250,
   file_browser_visible: false,
@@ -195,6 +197,10 @@ function parseClientViewState(value: unknown): ClientViewState {
     value.sidebar_active_tab === 'recent'
   )
     assign('sidebar_active_tab', value.sidebar_active_tab)
+  assign(
+    'pinned_recent_session_ids',
+    stringArray(value.pinned_recent_session_ids)
+  )
 
   for (const key of [
     'left_sidebar_visible',

@@ -113,4 +113,13 @@ describe('RecentWorktreesList structure', () => {
     expect(source).not.toContain('query.isFetching')
     expect(source).not.toContain('Updating…')
   })
+
+  it('pins sessions above recent rows and keeps the pin action hover-only', () => {
+    expect(source).toContain('toggleRecentSessionPinned(row.session.id)')
+    expect(source).toContain('pinned.has(row.session.id)')
+    expect(source).toContain('aPinned === bPinned ? 0 : aPinned ? -1 : 1')
+    expect(source).toContain('group-hover:opacity-100')
+    expect(source).toContain("isPinned ? 'Unpin session' : 'Pin session'")
+    expect(source).toContain('!isPinned &&')
+  })
 })
