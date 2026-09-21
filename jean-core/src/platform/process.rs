@@ -16,7 +16,6 @@ pub fn kill_and_reap(child: &mut Child) {
 
 /// Escape a string for safe use in a shell command.
 /// Wraps in single quotes and escapes any embedded single quotes.
-#[cfg(unix)]
 pub fn shell_escape(s: &str) -> String {
     format!("'{}'", s.replace('\'', "'\\''"))
 }

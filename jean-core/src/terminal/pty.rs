@@ -129,6 +129,19 @@ fn build_unix_shell_command(
     builder
 }
 
+/// Words to pass after `wsl.exe --` for a structured command.
+///
+/// wsl.exe hands everything after `--` to the distro's default shell, which
+/// re-parses it: quote each word so backslashes and shell metacharacters
+/// survive, and translate Windows path values (e.g.
+/// `--append-system-prompt-file C:\..`) so the CLI can open them.
+fn wsl_command_words(command: &str, args: &[String]) -> Vec<String> {
+    std::iter::once(command.to_string())
+        .chain(crate::platform::wslify_path_args(args))
+        .map(|word| crate::platform::shell_escape(&word))
+        .collect()
+}
+
 /// Spawn a terminal, optionally running a command
 ///
 /// On Unix, commands run through the user's interactive login shell so they
@@ -207,11 +220,7 @@ pub fn spawn_terminal(
             c.arg(&unix_cwd);
             c.arg("--");
             if let Some(ref args) = command_args {
-                // Direct binary invocation inside WSL
-                c.arg(run_command);
-                for arg in args {
-                    c.arg(arg);
-                }
+                c.args(wsl_command_words(run_command, args));
             } else {
                 // Shell-wrapped command inside WSL
                 c.arg("sh");
@@ -656,7 +665,7 @@ mod tests {
     use super::build_unix_shell_command;
     use super::{effective_pty_size, is_windows_batch_file};
     #[cfg(unix)]
-    use super::{terminal_utf8_locale_overrides, ParentLocale};
+    use super::{terminal_utf8_locale_overrides, wsl_command_words, ParentLocale};
 
     #[test]
     fn interrupt_and_suspend_bytes_are_recognized() {
@@ -675,6 +684,51 @@ mod tests {
         // Command/login PTYs always get a TUI-usable floor (issue #624).
         assert_eq!(effective_pty_size(12, 5, true), (80, 24));
         assert_eq!(effective_pty_size(100, 40, true), (100, 40));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn wsl_command_words_survive_shell_reparse() {
+        // wsl.exe joins the words after `--` and hands them to the default
+        // shell; reproduce that re-parse and check every argument arrives
+        // intact, with the Windows context file path translated.
+        let args = vec![
+            "--append-system-prompt-file".to_string(),
+            r"C:\Users\alice\AppData\Roaming\com.jean.desktop\combined-contexts\s-terminal-context.md"
+                .to_string(),
+            "--config".to_string(),
+            "base_instructions=\"Run `ls > out` and $(date)\"".to_string(),
+            "it's-safe".to_string(),
+        ];
+        let script = std::iter::once("printf '%s\\n'".to_string())
+            .chain(
+                wsl_command_words("/usr/bin/claude", &args)
+                    .into_iter()
+                    .skip(1),
+            )
+            .collect::<Vec<_>>()
+            .join(" ");
+        let output = std::process::Command::new("sh")
+            .args(["-c", &script])
+            .output()
+            .expect("run sh");
+        let stdout = String::from_utf8(output.stdout).unwrap();
+        let received: Vec<&str> = stdout.lines().collect();
+
+        assert_eq!(
+            received,
+            [
+                "--append-system-prompt-file",
+                "/mnt/c/Users/alice/AppData/Roaming/com.jean.desktop/combined-contexts/s-terminal-context.md",
+                "--config",
+                "base_instructions=\"Run `ls > out` and $(date)\"",
+                "it's-safe",
+            ]
+        );
+        assert_eq!(
+            wsl_command_words("/usr/bin/claude", &[])[0],
+            "'/usr/bin/claude'"
+        );
     }
 
     #[cfg(unix)]
