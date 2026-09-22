@@ -249,6 +249,13 @@ describe('ChatInput attachments', () => {
     expect(textarea.parentElement).toHaveClass('min-w-0')
   })
 
+  it('limits the normal textarea height to keep chat messages visible', () => {
+    const textarea = renderInput()
+
+    expect(textarea).toHaveClass('max-h-[30vh]')
+    expect(textarea).not.toHaveClass('max-h-[50vh]')
+  })
+
   it('caps the textarea height in mobile zen mode', () => {
     mobileState.value = true
     useUIStore.setState({ zenMode: true })
@@ -256,7 +263,7 @@ describe('ChatInput attachments', () => {
     const textarea = renderInput()
 
     expect(textarea).toHaveClass('h-12', 'max-h-12')
-    expect(textarea).not.toHaveClass('max-h-[50vh]')
+    expect(textarea).not.toHaveClass('max-h-[30vh]')
   })
 
   it('uses a compact textarea height in desktop zen mode', () => {
@@ -265,7 +272,7 @@ describe('ChatInput attachments', () => {
     const textarea = renderInput()
 
     expect(textarea).toHaveClass('h-12', 'max-h-12')
-    expect(textarea).not.toHaveClass('max-h-[50vh]')
+    expect(textarea).not.toHaveClass('max-h-[30vh]')
     expect(screen.queryByText('to focus')).not.toBeInTheDocument()
   })
 
