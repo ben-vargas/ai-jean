@@ -250,8 +250,21 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
             const isWorking = status.tone === 'working'
             const isUnread = isUnreadSession(row.session)
             const isPinned = pinnedSessionIds.includes(row.session.id)
+            const showPinnedSeparator =
+              !isPinned &&
+              index > 0 &&
+              pinnedSessionIds.includes(
+                displayedRows[index - 1]?.session.id ?? ''
+              )
             return (
               <li key={row.session.id} className="group relative">
+                {showPinnedSeparator && (
+                  <div
+                    role="separator"
+                    aria-hidden="true"
+                    className="mx-1 mb-2 border-t border-border/70"
+                  />
+                )}
                 {showSnoozed &&
                   !isPinned &&
                   isSnoozedSession(row.lastActivityAt) &&

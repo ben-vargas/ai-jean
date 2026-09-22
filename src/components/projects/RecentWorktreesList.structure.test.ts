@@ -128,5 +128,8 @@ describe('RecentWorktreesList structure', () => {
     expect(source).toContain('md:pr-3')
     expect(source).toContain("isPinned ? 'Unpin session' : 'Pin session'")
     expect(source).toContain('!isPinned &&')
+    expect(source).toContain('showPinnedSeparator')
+    expect(source).toContain('role="separator"')
+    expect(source).toContain('border-t border-border/70')
   })
 })
