@@ -92,9 +92,10 @@ keys continue to use backend persistence. New code can use
 
 Project and worktree display state uses the same ownership rule through the
 versioned `jean-client-view-state-v1` browser storage record. This includes
-canvas sorting and filters, tree expansion, dashboard favorites, sidebar
-layout, and browser/terminal layout. Resource-keyed values must use scoped
-server resource IDs. `useClientViewStatePersistence()` migrates the legacy
+canvas sorting and active filters, tree expansion, dashboard favorites, sidebar
+layout, and browser/terminal layout. Pinned recent sessions and pinned canvas
+label filters are shared through server UI state instead. Resource-keyed values
+must use scoped server resource IDs. `useClientViewStatePersistence()` migrates the legacy
 server UI-state values on first load and then makes the client record
 authoritative. Keep session data, running terminal metadata, drafts, and other
 operational state in the backend persistence paths.

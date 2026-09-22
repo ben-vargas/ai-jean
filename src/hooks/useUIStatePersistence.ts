@@ -29,6 +29,16 @@ import type {
 } from '@/types/ui-state'
 import { registerUIStateRelaunchSaver } from '@/lib/ui-state-relaunch'
 
+const getPinnedCanvasSettings = () =>
+  Object.fromEntries(
+    Object.entries(useProjectsStore.getState().projectCanvasSettings).flatMap(
+      ([projectId, settings]) =>
+        settings.pinnedLabels && settings.pinnedLabels.length > 0
+          ? [[projectId, { pinned_labels: settings.pinnedLabels }] as const]
+          : []
+    )
+  )
+
 /** Serialize ready (non-loading) pending images for UI-state persistence. */
 function serializePendingImages(
   pendingImages: Record<string, PendingImage[]>
@@ -173,7 +183,8 @@ export function useUIStatePersistence() {
       reviewSidebarVisible,
       lastOpenedPerProject,
     } = useChatStore.getState()
-    const { selectedProjectId } = useProjectsStore.getState()
+    const { selectedProjectId, pinnedRecentSessionIds } =
+      useProjectsStore.getState()
     const {
       sessionTerminalIds,
       sessionPrimarySurface,
@@ -251,6 +262,8 @@ export function useUIStatePersistence() {
       // Browser pane state (per-worktree tabs + 3-surface visibility)
       browser_tabs: browserTabsForPersist,
       browser_active_tab_ids: browserState.activeTabIds,
+      project_canvas_settings: getPinnedCanvasSettings(),
+      pinned_recent_session_ids: pinnedRecentSessionIds,
       // Last opened worktree+session per project (convert camelCase → snake_case keys)
       last_opened_per_project: Object.fromEntries(
         Object.entries(lastOpenedPerProject).map(([projectId, entry]) => [
@@ -925,6 +938,10 @@ export function useUIStatePersistence() {
       )
     }
 
+    useProjectsStore
+      .getState()
+      .setPinnedRecentSessionIds(uiState.pinned_recent_session_ids ?? [])
+
     const githubDashboardFavoriteProjectIds =
       uiState.github_dashboard_favorite_project_ids ?? []
     if (githubDashboardFavoriteProjectIds.length > 0) {
@@ -1094,6 +1111,9 @@ export function useUIStatePersistence() {
 
     // Track previous values to detect actual changes
     let prevSelectedProjectId = useProjectsStore.getState().selectedProjectId
+    let prevPinnedCanvasSettings = JSON.stringify(getPinnedCanvasSettings())
+    let prevPinnedRecentSessionIds =
+      useProjectsStore.getState().pinnedRecentSessionIds
     let prevSessionTerminalIds = useUIStore.getState().sessionTerminalIds
     let prevSessionPrimarySurface = useUIStore.getState().sessionPrimarySurface
     let prevSeenFailedWorkflowRunIds =
@@ -1121,9 +1141,20 @@ export function useUIStatePersistence() {
       // Check if expandedProjectIds, expandedFolderIds, or selectedProjectId changed
       const selectedProjectChanged =
         state.selectedProjectId !== prevSelectedProjectId
+      const nextPinnedCanvasSettings = JSON.stringify(getPinnedCanvasSettings())
+      const pinnedCanvasSettingsChanged =
+        nextPinnedCanvasSettings !== prevPinnedCanvasSettings
+      const pinnedRecentSessionIdsChanged =
+        state.pinnedRecentSessionIds !== prevPinnedRecentSessionIds
 
-      if (selectedProjectChanged) {
+      if (
+        selectedProjectChanged ||
+        pinnedCanvasSettingsChanged ||
+        pinnedRecentSessionIdsChanged
+      ) {
         prevSelectedProjectId = state.selectedProjectId
+        prevPinnedCanvasSettings = nextPinnedCanvasSettings
+        prevPinnedRecentSessionIds = state.pinnedRecentSessionIds
         const currentState = getCurrentUIState()
         debouncedSaveRef.current?.(currentState)
       }
