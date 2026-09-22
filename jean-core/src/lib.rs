@@ -4646,7 +4646,7 @@ fn repair_managed_cli_links(context: &RuntimeContext, preferences: &AppPreferenc
     };
 
     #[cfg(windows)]
-    let executable = |unix: &str, windows: &str| windows.to_string();
+    let executable = |_unix: &str, windows: &str| windows.to_string();
     #[cfg(not(windows))]
     let executable = |unix: &str, _windows: &str| unix.to_string();
 
