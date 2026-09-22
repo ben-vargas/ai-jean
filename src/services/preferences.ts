@@ -17,6 +17,7 @@ import {
 } from '@/lib/client-preferences'
 import { useSettingsTargetServerId } from '@/lib/settings-target'
 import { LOCAL_SERVER_ID } from '@/types/server-resource'
+import type { ServerId } from '@/types/server-resource'
 
 // Old default keybindings that have been changed - used for migration
 // When a default changes, add the old value here so stored prefs get updated
@@ -111,8 +112,9 @@ export function useUpdateServerPreferences() {
 }
 
 // TanStack Query hooks following the architectural patterns
-export function usePreferences() {
-  const serverId = useSettingsTargetServerId()
+export function usePreferences(serverIdOverride?: ServerId) {
+  const settingsTargetServerId = useSettingsTargetServerId()
+  const serverId = serverIdOverride ?? settingsTargetServerId
   return useQuery({
     queryKey: preferencesQueryKeys.preferences(serverId),
     queryFn: async (): Promise<AppPreferences> => {
