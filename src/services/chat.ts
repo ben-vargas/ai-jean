@@ -374,12 +374,8 @@ export function useSessions(
       : chatQueryKeys.sessions(worktreeId ?? ''),
     queryFn: async (): Promise<WorktreeSessions> => {
       if (!hasBackendTransport() || !worktreeId || !worktreePath) {
-        return {
-          worktree_id: '',
-          sessions: [],
-          active_session_id: null,
-          version: 2,
-        }
+        // An empty success is cached for the stale time and hides every tab.
+        throw new Error('Session list is not available yet')
       }
 
       try {

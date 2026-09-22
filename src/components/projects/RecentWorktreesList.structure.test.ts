@@ -38,9 +38,9 @@ describe('RecentWorktreesList structure', () => {
     expect(source).toContain(
       'className="justify-self-end text-[10px] tabular-nums"'
     )
-    expect(source).toContain('col-start-2 flex min-h-4 justify-self-end gap-1')
+    expect(source).toContain('flex min-h-4 items-center justify-between')
     expect(source).toContain(
-      '<span className="col-start-2 flex min-h-4 justify-self-end gap-1'
+      '<span className="flex gap-1 text-[10px] font-medium tabular-nums">'
     )
     expect(source).not.toContain('pt-4')
     expect(source).not.toContain('absolute right-3 top-2')
@@ -58,7 +58,7 @@ describe('RecentWorktreesList structure', () => {
 
   it('uses fully rounded rows and a full background for the current row', () => {
     expect(source).toContain('className="flex flex-col gap-2 px-2 py-2"')
-    expect(source).toContain('rounded-lg border py-2.5 pl-3 pr-9')
+    expect(source).toContain('rounded-lg border py-2.5 pl-3 pr-3')
     expect(source).toContain(
       "isCurrent ? 'border-border bg-muted/50 text-foreground shadow'"
     )
@@ -124,8 +124,21 @@ describe('RecentWorktreesList structure', () => {
     expect(source).toContain('opacity-100')
     expect(source).toContain('md:opacity-0')
     expect(source).toContain('md:group-hover:opacity-100')
-    expect(source).toContain('pr-9')
-    expect(source).toContain('md:pr-3')
+    expect(source).toContain('flex size-4 shrink-0')
+    expect(source).toContain('flex min-h-4 items-center justify-between')
+    expect(source).not.toContain('absolute right-full')
+    expect(source).not.toContain('absolute right-1 top-1')
+    expect(source).not.toContain('pr-9')
+    const projectName = source.indexOf(
+      '{row.projectName} · {row.worktree.name}'
+    )
+    const pinLabel = source.indexOf(
+      "isPinned ? 'Unpin session' : 'Pin session'"
+    )
+    const gitAdded = source.indexOf('+{row.added}')
+    expect(projectName).toBeGreaterThan(-1)
+    expect(pinLabel).toBeGreaterThan(projectName)
+    expect(gitAdded).toBeGreaterThan(pinLabel)
     expect(source).toContain("isPinned ? 'Unpin session' : 'Pin session'")
     expect(source).toContain('!isPinned &&')
     expect(source).toContain('showPinnedSeparator')

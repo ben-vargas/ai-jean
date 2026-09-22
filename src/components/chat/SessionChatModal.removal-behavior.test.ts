@@ -174,7 +174,8 @@ describe('SessionChatModal removal behavior', () => {
     expect(source).toContain('state => state.zenMode')
     expect(source).toContain('data-testid="toggle-zen-mode"')
     expect(source).not.toContain('{!(zenMode && isMobile) && (')
-    expect(source).toContain('{!zenMode && sessions.length > 0 && (')
+    expect(source).toContain('{!zenMode && showSessionTabs && (')
+    expect(source).toContain('sessionsForTabBar(sessions, missingActiveSession')
     expect(source).toContain('{!zenMode && (')
     expect(source).toContain('<ModalCloseButton')
     expect(source).toContain('onClick={handleClose}')
@@ -202,7 +203,7 @@ describe('SessionChatModal removal behavior', () => {
     const source = readSource('src/components/chat/SessionChatModal.tsx')
 
     expect(source).toMatch(
-      /viewport\.addEventListener\('wheel',[\s\S]*\}, \[sessions\.length, zenMode\]\)/
+      /viewport\.addEventListener\('wheel',[\s\S]*\}, \[showSessionTabs, zenMode\]\)/
     )
   })
 

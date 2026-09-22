@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import type { Session } from '@/types/chat'
 import type { SessionCardData } from './session-card-utils'
 import {
+  mergeSessionIntoWorktreeSessions,
   resolveModalSessionId,
+  sessionsForTabBar,
   sortSessionCardsForTabs,
 } from './session-tab-order'
 
@@ -83,5 +85,55 @@ describe('resolveModalSessionId', () => {
 
   it('returns null when there is no active session and no sessions', () => {
     expect(resolveModalSessionId(undefined, [])).toBeNull()
+  })
+})
+
+describe('sessionsForTabBar', () => {
+  it('keeps the open session when the worktree list is empty', () => {
+    const open = session('open', 1)
+
+    expect(sessionsForTabBar([], open).map(item => item.id)).toEqual(['open'])
+  })
+
+  it('does not duplicate a session that is already in the list', () => {
+    const open = session('open', 1)
+    const other = session('other', 2)
+
+    expect(sessionsForTabBar([other, open], open).map(item => item.id)).toEqual(
+      ['other', 'open']
+    )
+  })
+})
+
+describe('mergeSessionIntoWorktreeSessions', () => {
+  it('creates a list from the known session when the cache is empty', () => {
+    const open = session('open', 1)
+
+    expect(
+      mergeSessionIntoWorktreeSessions(undefined, 'worktree-1', open)
+    ).toMatchObject({
+      worktree_id: 'worktree-1',
+      active_session_id: 'open',
+      sessions: [open],
+    })
+  })
+
+  it('adds the known session without dropping sessions already cached', () => {
+    const open = session('open', 1)
+    const other = session('other', 2)
+
+    const merged = mergeSessionIntoWorktreeSessions(
+      {
+        worktree_id: 'worktree-1',
+        sessions: [other],
+        active_session_id: 'other',
+        version: 2,
+      },
+      'worktree-1',
+      open
+    )
+
+    expect(merged.sessions.map(item => item.id)).toEqual(['other', 'open'])
+    expect(merged.active_session_id).toBe('other')
   })
 })

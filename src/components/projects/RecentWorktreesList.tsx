@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import {
+  keepPreviousData,
+  useQuery,
+  useQueryClient,
+} from '@tanstack/react-query'
 import { AlertTriangle, BellDot, Pin, Plus } from '@/components/icons/reicon'
 import { useIsMobile } from '@/hooks/use-mobile'
+import { mergeSessionIntoWorktreeSessions } from '@/components/chat/session-tab-order'
 import { useChatStore } from '@/store/chat-store'
 import { useProjectsStore } from '@/store/projects-store'
 import { useUIStore } from '@/store/ui-store'
+import { chatQueryKeys } from '@/services/chat'
 import { fetchRecentWorktrees } from '@/services/projects'
 import { fetchWorktreesStatus } from '@/services/git-status'
+import type { WorktreeSessions } from '@/types/chat'
 import type { Project, RecentWorktreeItem } from '@/types/projects'
 import { isUnreadSession } from '@/components/unread/unread-utils'
 import { getRecentSessionStatus } from './recent-session-status'
@@ -59,6 +66,7 @@ export function getAdjacentRecentRow(
 
 export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
   const isMobile = useIsMobile()
+  const queryClient = useQueryClient()
   const selectProject = useProjectsStore(state => state.selectProject)
   const selectWorktree = useProjectsStore(state => state.selectWorktree)
   const selectedWorktreeId = useProjectsStore(state => state.selectedWorktreeId)
@@ -139,24 +147,47 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
 
   const handleOpen = useCallback(
     (row: RecentWorktreeItem) => {
-      selectProject(row.projectId)
-      selectWorktree(row.worktree.id)
-      useChatStore.getState().clearActiveWorktree()
-      useChatStore.getState().setActiveSession(row.worktree.id, row.session.id)
-      window.setTimeout(() => {
-        window.dispatchEvent(
-          new CustomEvent('open-session-modal', {
-            detail: {
-              sessionId: row.session.id,
-              worktreeId: row.worktree.id,
-              worktreePath: row.worktree.path,
-            },
-          })
+      const worktreeId = row.worktree.id
+      const sessionId = row.session.id
+      for (const queryKey of [
+        chatQueryKeys.sessions(worktreeId),
+        [...chatQueryKeys.sessions(worktreeId), 'with-counts'],
+      ]) {
+        queryClient.setQueryData<WorktreeSessions | undefined>(
+          queryKey,
+          current =>
+            mergeSessionIntoWorktreeSessions(current, worktreeId, row.session)
         )
-      }, 50)
+      }
+      void queryClient.invalidateQueries({
+        queryKey: chatQueryKeys.sessions(worktreeId),
+      })
+
+      selectProject(row.projectId)
+      selectWorktree(worktreeId)
+      const chat = useChatStore.getState()
+      chat.registerWorktreePath(worktreeId, row.worktree.path)
+      chat.clearActiveWorktree()
+      chat.setActiveSession(worktreeId, sessionId)
+      chat.setLastOpenedForProject(row.projectId, worktreeId, sessionId)
+      // The project canvas remounts when the repo changes. A timed window
+      // event is lost during that remount, so queue the open until the new
+      // canvas is ready. Also dispatch now for a canvas that is already open.
+      useUIStore
+        .getState()
+        .markWorktreeForAutoOpenSession(worktreeId, sessionId)
+      window.dispatchEvent(
+        new CustomEvent('open-session-modal', {
+          detail: {
+            sessionId,
+            worktreeId,
+            worktreePath: row.worktree.path,
+          },
+        })
+      )
       if (isMobile) useUIStore.getState().setLeftSidebarVisible(false)
     },
-    [isMobile, selectProject, selectWorktree]
+    [isMobile, queryClient, selectProject, selectWorktree]
   )
 
   useEffect(() => {
@@ -257,7 +288,7 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
                 displayedRows[index - 1]?.session.id ?? ''
               )
             return (
-              <li key={row.session.id} className="group relative">
+              <li key={row.session.id} className="group">
                 {showPinnedSeparator && (
                   <div
                     role="separator"
@@ -279,79 +310,87 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
                       Snoozed · inactive for 24 hours
                     </div>
                   )}
-                <button
-                  ref={element => {
-                    if (element) rowRefs.current.set(row.session.id, element)
-                    else rowRefs.current.delete(row.session.id)
-                  }}
-                  type="button"
-                  aria-current={isCurrent ? 'page' : undefined}
-                  aria-label={`${row.session.name}, ${row.projectName}, ${row.worktree.name}, ${status.label}${isUnread ? ', unread' : ''}, ${activityLabel}`}
-                  className={`grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1 rounded-lg border py-2.5 pl-3 pr-9 text-left transition-[background-color,border-color,box-shadow,color] hover:bg-muted/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:pr-3 ${isCurrent ? 'border-border bg-muted/50 text-foreground shadow' : 'border-transparent bg-transparent text-muted-foreground'}`}
-                  onClick={() => handleOpen(row)}
+                <div
+                  className={`flex w-full flex-col gap-y-1 rounded-lg border py-2.5 pl-3 pr-3 text-left transition-[background-color,border-color,box-shadow,color] hover:bg-muted/30 hover:text-foreground has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-ring ${isCurrent ? 'border-border bg-muted/50 text-foreground shadow' : 'border-transparent bg-transparent text-muted-foreground'}`}
                 >
-                  <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
-                    {namingSessionIds[row.session.id]
-                      ? 'Generating…'
-                      : row.session.name}
-                  </span>
-                  <span className="flex min-w-14 items-center justify-end gap-1.5 text-[10px]">
-                    {isUnread && (
-                      <BellDot
-                        aria-label="Unread session"
-                        className="size-3.5 shrink-0 text-yellow-400"
-                      />
-                    )}
-                    {isWorking ? (
-                      <span
-                        aria-hidden="true"
-                        className="recent-working-waveform text-violet-500 dark:text-violet-400"
-                      >
-                        <span />
-                        <span />
-                        <span />
-                      </span>
-                    ) : (
-                      status.tone !== 'completed' && (
-                        <span className={`font-medium ${statusClassName}`}>
-                          {status.label}
-                        </span>
-                      )
-                    )}
-                  </span>
-                  <span className="min-w-0 truncate text-[11px]">
-                    {row.projectName} · {row.worktree.name}
-                  </span>
-                  <time
-                    className="justify-self-end text-[10px] tabular-nums"
-                    dateTime={new Date(row.lastActivityAt * 1000).toISOString()}
+                  <button
+                    ref={element => {
+                      if (element) rowRefs.current.set(row.session.id, element)
+                      else rowRefs.current.delete(row.session.id)
+                    }}
+                    type="button"
+                    aria-current={isCurrent ? 'page' : undefined}
+                    aria-label={`${row.session.name}, ${row.projectName}, ${row.worktree.name}, ${status.label}${isUnread ? ', unread' : ''}, ${activityLabel}`}
+                    className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1 text-left focus-visible:outline-none"
+                    onClick={() => handleOpen(row)}
                   >
-                    {activity}
-                  </time>
-                  <span className="col-start-2 flex min-h-4 justify-self-end gap-1 text-[10px] font-medium tabular-nums">
-                    {(row.added > 0 || row.removed > 0) && (
-                      <>
-                        <span className="text-green-500">+{row.added}</span>
-                        <span className="text-red-500">-{row.removed}</span>
-                      </>
-                    )}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  aria-label={isPinned ? 'Unpin session' : 'Pin session'}
-                  title={isPinned ? 'Unpin session' : 'Pin session'}
-                  className="absolute right-1 top-1 z-10 flex size-6 items-center justify-center rounded-md bg-background/90 text-muted-foreground opacity-100 transition-opacity hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:opacity-0 md:focus-visible:opacity-100 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
-                  onClick={() =>
-                    useProjectsStore
-                      .getState()
-                      .toggleRecentSessionPinned(row.session.id)
-                  }
-                >
-                  <Pin
-                    className={`size-3.5 ${isPinned ? 'fill-current' : ''}`}
-                  />
-                </button>
+                    <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
+                      {namingSessionIds[row.session.id]
+                        ? 'Generating…'
+                        : row.session.name}
+                    </span>
+                    <span className="flex min-w-14 items-center justify-end gap-1.5 text-[10px]">
+                      {isUnread && (
+                        <BellDot
+                          aria-label="Unread session"
+                          className="size-3.5 shrink-0 text-yellow-400"
+                        />
+                      )}
+                      {isWorking ? (
+                        <span
+                          aria-hidden="true"
+                          className="recent-working-waveform text-violet-500 dark:text-violet-400"
+                        >
+                          <span />
+                          <span />
+                          <span />
+                        </span>
+                      ) : (
+                        status.tone !== 'completed' && (
+                          <span className={`font-medium ${statusClassName}`}>
+                            {status.label}
+                          </span>
+                        )
+                      )}
+                    </span>
+                    <span className="min-w-0 truncate text-[11px]">
+                      {row.projectName} · {row.worktree.name}
+                    </span>
+                    <time
+                      className="justify-self-end text-[10px] tabular-nums"
+                      dateTime={new Date(
+                        row.lastActivityAt * 1000
+                      ).toISOString()}
+                    >
+                      {activity}
+                    </time>
+                  </button>
+                  <div className="flex min-h-4 items-center justify-between">
+                    <button
+                      type="button"
+                      aria-label={isPinned ? 'Unpin session' : 'Pin session'}
+                      title={isPinned ? 'Unpin session' : 'Pin session'}
+                      className="flex size-4 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-100 transition-opacity hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:opacity-0 md:focus-visible:opacity-100 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+                      onClick={() =>
+                        useProjectsStore
+                          .getState()
+                          .toggleRecentSessionPinned(row.session.id)
+                      }
+                    >
+                      <Pin
+                        className={`size-3.5 ${isPinned ? 'fill-current' : ''}`}
+                      />
+                    </button>
+                    <span className="flex gap-1 text-[10px] font-medium tabular-nums">
+                      {(row.added > 0 || row.removed > 0) && (
+                        <>
+                          <span className="text-green-500">+{row.added}</span>
+                          <span className="text-red-500">-{row.removed}</span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                </div>
               </li>
             )
           })}
