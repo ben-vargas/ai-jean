@@ -1144,7 +1144,7 @@ export function SessionChatModal({
                   {!zenMode && (
                     <>
                       {/* Desktop: secondary tools that are not in the menu */}
-                      <div className="hidden 2xl:flex items-center gap-1">
+                      <div className="hidden lg:flex items-center gap-1">
                         <OpenInButton
                           worktreePath={worktreePath}
                           serverId={worktree?.serverId}

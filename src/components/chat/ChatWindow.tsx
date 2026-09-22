@@ -1020,21 +1020,22 @@ function ChatWindowContent({
 
   const isSending = isSendingForSession
 
-  // PERFORMANCE: Content selectors use deferredSessionId to prevent sync re-render cascade
-  // When switching tabs, these selectors return stable values until React catches up
-  // This prevents the ~1 second freeze from 15+ selectors re-evaluating simultaneously
+  // Keep live status and live output on the same immediate session key. If the
+  // timer follows activeSessionId while output follows a deferred/previous id,
+  // the UI can show a running timer with no output and briefly render another
+  // session when the first chunk arrives.
   // IMPORTANT: Use stable empty array constants to prevent infinite render loops
   const streamingContent = useChatStore(state =>
-    deferredSessionId ? (state.streamingContents[deferredSessionId] ?? '') : ''
+    activeSessionId ? (state.streamingContents[activeSessionId] ?? '') : ''
   )
   const currentToolCalls = useChatStore(state =>
-    deferredSessionId
-      ? (state.activeToolCalls[deferredSessionId] ?? EMPTY_TOOL_CALLS)
+    activeSessionId
+      ? (state.activeToolCalls[activeSessionId] ?? EMPTY_TOOL_CALLS)
       : EMPTY_TOOL_CALLS
   )
   const currentStreamingContentBlocks = useChatStore(state =>
-    deferredSessionId
-      ? (state.streamingContentBlocks[deferredSessionId] ??
+    activeSessionId
+      ? (state.streamingContentBlocks[activeSessionId] ??
         EMPTY_CONTENT_BLOCKS)
       : EMPTY_CONTENT_BLOCKS
   )
