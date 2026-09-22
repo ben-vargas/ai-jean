@@ -1896,6 +1896,8 @@ pub async fn install_codex_cli(app: AppHandle, version: Option<String>) -> Resul
         {
             log::warn!("Could not install Codex code-mode host into WSL: {e}");
         }
+        #[cfg(windows)]
+        crate::expose_managed_cli_in_wsl(&wsl.distro, "codex", &unix_path);
         emit_progress(&app, "complete", "Installation complete!", 100);
         log::trace!("Codex CLI installed successfully at WSL:{unix_path}");
         return Ok(());
@@ -2031,6 +2033,7 @@ pub async fn install_codex_cli(app: AppHandle, version: Option<String>) -> Resul
     emit_progress(&app, "complete", "Installation complete!", 100);
 
     log::trace!("Codex CLI installed successfully at {:?}", binary_path);
+    crate::expose_managed_cli("codex", &binary_path);
     Ok(())
 }
 

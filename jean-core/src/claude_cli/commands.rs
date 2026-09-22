@@ -517,6 +517,8 @@ pub async fn install_claude_cli(app: AppHandle, version: Option<String>) -> Resu
         crate::platform::wsl_write_bytes(&wsl.distro, &unix_path, &binary_content)
             .map_err(|e| format!("Failed to write binary into WSL: {e}"))?;
         crate::platform::wsl_chmod_exec(&wsl.distro, &unix_path)?;
+        #[cfg(windows)]
+        crate::expose_managed_cli_in_wsl(&wsl.distro, "claude", &unix_path);
         emit_progress(&app, "complete", "Installation complete!", 100);
         log::trace!("Claude CLI installed successfully at WSL:{unix_path}");
         return Ok(());
@@ -565,6 +567,7 @@ pub async fn install_claude_cli(app: AppHandle, version: Option<String>) -> Resu
     emit_progress(&app, "complete", "Installation complete!", 100);
 
     log::trace!("Claude CLI installed successfully at {:?}", binary_path);
+    crate::expose_managed_cli("claude", &binary_path);
     Ok(())
 }
 

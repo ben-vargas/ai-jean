@@ -721,6 +721,7 @@ pub async fn install_grok_cli(app: AppHandle, version: Option<String>) -> Result
         return Err("Grok CLI verification failed".to_string());
     }
 
+    crate::expose_managed_cli("grok", &get_cli_binary_path(&app)?);
     Ok(())
 }
 

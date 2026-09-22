@@ -4538,6 +4538,15 @@ pub async fn start_runtime_services(context: RuntimeContext) -> Result<(), Strin
     );
     sync_jean_mcp_socket_from_preferences(context.clone(), &preferences).await?;
 
+    // A Jean-managed backend should also be usable from a normal terminal.
+    // Repair these stable launchers on every start so installs made by older
+    // Jean versions and future managed-path changes are covered.
+    let link_context = context.clone();
+    let link_preferences = preferences.clone();
+    async_runtime::spawn_blocking(move || {
+        repair_managed_cli_links(&link_context, &link_preferences);
+    });
+
     // Required integrations are repaired on every launch. Do this outside the
     // startup path because agent-browser can download Chromium on first use.
     async_runtime::spawn(async move {
@@ -4585,6 +4594,163 @@ pub async fn start_runtime_services(context: RuntimeContext) -> Result<(), Strin
     });
 
     Ok(())
+}
+
+fn repair_managed_cli_links(context: &RuntimeContext, preferences: &AppPreferences) {
+    let wsl = platform::get_wsl_config();
+    #[cfg(windows)]
+    if wsl.enabled {
+        let Ok(home) = platform::get_wsl_home_dir(&wsl.distro) else {
+            log::warn!("Could not resolve WSL home directory for managed CLI links");
+            return;
+        };
+        let entries = [
+            (
+                "claude",
+                preferences.claude_cli_source.as_str(),
+                format!("{home}/.local/share/jean/claude-cli/claude"),
+            ),
+            (
+                "codex",
+                preferences.codex_cli_source.as_str(),
+                format!("{home}/.local/share/jean/codex-cli/codex"),
+            ),
+            (
+                "opencode",
+                preferences.opencode_cli_source.as_str(),
+                format!("{home}/.local/share/jean/opencode-cli/opencode"),
+            ),
+            (
+                "gh",
+                preferences.gh_cli_source.as_str(),
+                format!("{home}/.local/share/jean/gh-cli/gh"),
+            ),
+        ];
+        for (tool, source, managed_binary) in entries {
+            if source == "jean" {
+                if let Err(error) =
+                    platform::ensure_managed_cli_link_in_wsl(&wsl.distro, tool, &managed_binary)
+                {
+                    log::warn!("Failed to expose Jean-managed {tool} CLI in WSL: {error}");
+                }
+            }
+        }
+        return;
+    }
+    #[cfg(not(windows))]
+    let _ = wsl;
+
+    let Ok(app_data) = context.path().app_data_dir() else {
+        log::warn!("Could not resolve app data directory for managed CLI links");
+        return;
+    };
+
+    #[cfg(windows)]
+    let executable = |unix: &str, windows: &str| windows.to_string();
+    #[cfg(not(windows))]
+    let executable = |unix: &str, _windows: &str| unix.to_string();
+
+    let entries = [
+        (
+            "claude",
+            preferences.claude_cli_source.as_str(),
+            app_data
+                .join("claude-cli")
+                .join(executable("claude", "claude.exe")),
+        ),
+        (
+            "codex",
+            preferences.codex_cli_source.as_str(),
+            app_data
+                .join("codex-cli")
+                .join(executable("codex", "codex.exe")),
+        ),
+        (
+            "opencode",
+            preferences.opencode_cli_source.as_str(),
+            app_data
+                .join("opencode-cli")
+                .join(executable("opencode", "opencode.exe")),
+        ),
+        (
+            "pi",
+            preferences.pi_cli_source.as_str(),
+            app_data
+                .join("pi-cli")
+                .join("node_modules")
+                .join(".bin")
+                .join(executable("pi", "pi.cmd")),
+        ),
+        (
+            "grok",
+            preferences.grok_cli_source.as_str(),
+            app_data
+                .join("grok-cli")
+                .join("node_modules")
+                .join(".bin")
+                .join(executable("grok", "grok.cmd")),
+        ),
+        (
+            "kimi",
+            preferences.kimi_cli_source.as_str(),
+            app_data
+                .join("kimi-code-cli")
+                .join("node_modules")
+                .join(".bin")
+                .join(executable("kimi", "kimi.cmd")),
+        ),
+        (
+            "agy",
+            preferences.antigravity_cli_source.as_str(),
+            app_data
+                .join("antigravity-cli")
+                .join(executable("agy", "agy.exe")),
+        ),
+        (
+            "cmdc",
+            preferences.commandcode_cli_source.as_str(),
+            app_data
+                .join("commandcode-cli")
+                .join("node_modules")
+                .join(".bin")
+                .join(executable("cmd", "cmdc.cmd")),
+        ),
+        (
+            "coderabbit",
+            preferences.coderabbit_cli_source.as_str(),
+            app_data
+                .join("coderabbit-cli")
+                .join(executable("coderabbit", "coderabbit.exe")),
+        ),
+        (
+            "gh",
+            preferences.gh_cli_source.as_str(),
+            app_data.join("gh-cli").join(executable("gh", "gh.exe")),
+        ),
+    ];
+
+    for (tool, source, managed_binary) in entries {
+        if source != "jean" {
+            continue;
+        }
+        if let Err(error) = platform::ensure_managed_cli_link(tool, &managed_binary) {
+            log::warn!("Failed to expose Jean-managed {tool} CLI: {error}");
+        }
+    }
+}
+
+/// Expose a newly installed Jean-managed CLI without waiting for an app restart.
+pub fn expose_managed_cli(tool: &str, managed_binary: &std::path::Path) {
+    if let Err(error) = platform::ensure_managed_cli_link(tool, managed_binary) {
+        log::warn!("Failed to expose Jean-managed {tool} CLI: {error}");
+    }
+}
+
+#[cfg(windows)]
+pub fn expose_managed_cli_in_wsl(distro: &str, tool: &str, managed_binary: &str) {
+    if let Err(error) = platform::ensure_managed_cli_link_in_wsl(distro, tool, managed_binary) {
+        log::warn!("Failed to expose Jean-managed {tool} CLI in WSL: {error}");
+    }
 }
 
 pub async fn set_project_avatar_from_path(

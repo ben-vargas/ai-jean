@@ -139,6 +139,14 @@ Each major system has focused documentation:
 
 Additional systems (no dedicated docs yet):
 
+- **Jean-managed CLI terminal access** - When a backend uses a Jean-managed
+  CLI and no independent executable is available on `PATH`, Jean exposes the
+  managed binary to normal terminals. Unix and WSL use stable links in
+  `~/.local/bin`; Windows uses a launcher in the per-user `WindowsApps`
+  directory, which is on the standard user `PATH`. Jean repairs these launchers
+  on startup and after managed installs or upgrades. A real system `PATH`
+  installation always takes precedence.
+
 - **Required agent integrations** - Jean MCP and Agent Browser are mandatory
   runtime services. Startup always enables the Jean MCP socket, repairs the
   supported CLI config entries, and installs Agent Browser plus Chrome for
