@@ -168,16 +168,23 @@ describe('model option helpers', () => {
     ).toBe('haiku')
   })
 
-  it('offers GPT 5.6 preview variants in Codex selectors', () => {
+  it('offers GPT 6 and GPT 5.6 variants in Codex selectors', () => {
     const values = codexDefaultModelOptions.map(option => option.value)
-    expect(values.slice(0, 4)).toEqual([
+    expect(values.slice(0, 9)).toEqual([
       'gpt-6-astra',
+      'gpt-6-sol',
+      'gpt-6-luna',
+      'gpt-6-astra-fast',
+      'gpt-6-sol-fast',
+      'gpt-6-luna-fast',
       'gpt-5.6-sol',
       'gpt-5.6-terra',
       'gpt-5.6-luna',
     ])
     expect(values).not.toContain('gpt-5.6')
     expect(normalizeCodexModel('gpt-6-astra')).toBe('gpt-6-astra')
+    expect(normalizeCodexModel('gpt-6-sol')).toBe('gpt-6-sol')
+    expect(normalizeCodexModel('gpt-6-luna')).toBe('gpt-6-luna')
     expect(normalizeCodexModel('gpt-5.6-sol')).toBe('gpt-5.6-sol')
     expect(normalizeCodexModel('gpt-5.6-terra')).toBe('gpt-5.6-terra')
     expect(normalizeCodexModel('gpt-5.6-luna')).toBe('gpt-5.6-luna')
@@ -187,6 +194,9 @@ describe('model option helpers', () => {
 
   it('offers Codex fast modes for default selectors', () => {
     const values = codexDefaultModelOptions.map(option => option.value)
+    expect(values).toContain('gpt-6-astra-fast')
+    expect(values).toContain('gpt-6-sol-fast')
+    expect(values).toContain('gpt-6-luna-fast')
     expect(values).toContain('gpt-5.6-sol-fast')
     expect(values).toContain('gpt-5.6-terra-fast')
     expect(values).toContain('gpt-5.6-luna-fast')
@@ -194,6 +204,7 @@ describe('model option helpers', () => {
     expect(values).toContain('gpt-5.4-fast')
     expect(values).toContain('gpt-5.4-mini-fast')
     expect(normalizeCodexModel('gpt-5.6-sol-fast')).toBe('gpt-5.6-sol-fast')
+    expect(normalizeCodexModel('gpt-6-sol-fast')).toBe('gpt-6-sol-fast')
     expect(normalizeCodexModel('gpt-5.6-fast')).toBe('gpt-5.6-sol-fast')
     expect(normalizeCodexModel('gpt-5-6-sol-fast')).toBe('gpt-5.6-sol-fast')
     expect(normalizeCodexModel('gpt-5.5-fast')).toBe('gpt-5.5-fast')

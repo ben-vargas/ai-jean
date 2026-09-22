@@ -1669,6 +1669,11 @@ export const effortLevelOptions: {
 // =============================================================================
 export type CodexModel =
   | 'gpt-6-astra'
+  | 'gpt-6-astra-fast'
+  | 'gpt-6-sol'
+  | 'gpt-6-sol-fast'
+  | 'gpt-6-luna'
+  | 'gpt-6-luna-fast'
   | 'gpt-5.6-sol'
   | 'gpt-5.6-sol-fast'
   | 'gpt-5.6-terra'
@@ -1691,6 +1696,9 @@ export type CodexModel =
 // Codex models that support fast service tier. Fast mode is exposed via a
 // separate UI toggle, not as standalone dropdown entries.
 export const CODEX_FAST_MODEL_MAP = {
+  'gpt-6-astra': 'gpt-6-astra-fast',
+  'gpt-6-sol': 'gpt-6-sol-fast',
+  'gpt-6-luna': 'gpt-6-luna-fast',
   'gpt-5.6-sol': 'gpt-5.6-sol-fast',
   'gpt-5.6-terra': 'gpt-5.6-terra-fast',
   'gpt-5.6-luna': 'gpt-5.6-luna-fast',
@@ -1737,6 +1745,8 @@ export function getCodexFastInfo(model: string): CodexFastInfo {
 
 export const codexModelOptions: { value: CodexModel; label: string }[] = [
   { value: 'gpt-6-astra', label: 'GPT 6 Astra' },
+  { value: 'gpt-6-sol', label: 'GPT 6 Sol' },
+  { value: 'gpt-6-luna', label: 'GPT 6 Luna' },
   { value: 'gpt-5.6-sol', label: 'GPT 5.6 Sol' },
   { value: 'gpt-5.6-terra', label: 'GPT 5.6 Terra' },
   { value: 'gpt-5.6-luna', label: 'GPT 5.6 Luna' },
@@ -1756,6 +1766,11 @@ export const codexDefaultModelOptions: {
   label: string
 }[] = [
   { value: 'gpt-6-astra', label: 'GPT 6 Astra' },
+  { value: 'gpt-6-sol', label: 'GPT 6 Sol' },
+  { value: 'gpt-6-luna', label: 'GPT 6 Luna' },
+  { value: 'gpt-6-astra-fast', label: 'GPT 6 Astra Fast' },
+  { value: 'gpt-6-sol-fast', label: 'GPT 6 Sol Fast' },
+  { value: 'gpt-6-luna-fast', label: 'GPT 6 Luna Fast' },
   { value: 'gpt-5.6-sol', label: 'GPT 5.6 Sol' },
   { value: 'gpt-5.6-terra', label: 'GPT 5.6 Terra' },
   { value: 'gpt-5.6-luna', label: 'GPT 5.6 Luna' },
@@ -1772,6 +1787,8 @@ export const codexDefaultModelOptions: {
     option =>
       ![
         'gpt-6-astra',
+        'gpt-6-sol',
+        'gpt-6-luna',
         'gpt-5.6',
         'gpt-5.6-sol',
         'gpt-5.6-terra',

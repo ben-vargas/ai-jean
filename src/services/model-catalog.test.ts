@@ -216,6 +216,44 @@ describe('model catalog', () => {
     ])
   })
 
+  it('uses the documented effort levels for bundled GPT 6 Sol', () => {
+    const reasoning = getCatalogModelReasoning(null, 'codex', 'gpt-6-sol')
+
+    expect(reasoning?.default).toBe('medium')
+    expect(reasoning?.levels.map(level => level.value)).toEqual([
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+      'max',
+      'ultra',
+    ])
+  })
+
+  it('exposes fast mode for bundled GPT 6 models', () => {
+    for (const model of ['gpt-6-astra', 'gpt-6-sol', 'gpt-6-luna']) {
+      expect(getCatalogModelFastInfo(null, 'codex', model)).toEqual({
+        supportsFast: true,
+        isFast: false,
+        baseModel: model,
+        fastModel: `${model}-fast`,
+      })
+    }
+  })
+
+  it('does not expose Ultra effort for bundled GPT 6 Luna', () => {
+    const reasoning = getCatalogModelReasoning(null, 'codex', 'gpt-6-luna')
+
+    expect(reasoning?.default).toBe('medium')
+    expect(reasoning?.levels.map(level => level.value)).toEqual([
+      'low',
+      'medium',
+      'high',
+      'xhigh',
+      'max',
+    ])
+  })
+
   it('does not expose Ultra effort for bundled GPT 5.6 Luna', () => {
     const reasoning = getCatalogModelReasoning(
       null,
