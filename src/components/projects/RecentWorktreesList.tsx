@@ -311,7 +311,8 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
                     </div>
                   )}
                 <div
-                  className={`flex w-full flex-col gap-y-1 rounded-lg border py-2.5 pl-3 pr-3 text-left transition-[background-color,border-color,box-shadow,color] hover:bg-muted/30 hover:text-foreground has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-ring ${isCurrent ? 'border-border bg-muted/50 text-foreground shadow' : 'border-transparent bg-transparent text-muted-foreground'}`}
+                  className={`flex w-full cursor-pointer flex-col gap-y-1 rounded-lg border py-2.5 pl-3 pr-3 text-left transition-[background-color,border-color,box-shadow,color] hover:bg-muted/30 hover:text-foreground has-[:focus-visible]:ring-1 has-[:focus-visible]:ring-ring ${isCurrent ? 'border-border bg-muted/50 text-foreground shadow' : 'border-transparent bg-transparent text-muted-foreground'}`}
+                  onClick={() => handleOpen(row)}
                 >
                   <button
                     ref={element => {
@@ -322,7 +323,6 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
                     aria-current={isCurrent ? 'page' : undefined}
                     aria-label={`${row.session.name}, ${row.projectName}, ${row.worktree.name}, ${status.label}${isUnread ? ', unread' : ''}, ${activityLabel}`}
                     className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1 text-left focus-visible:outline-none"
-                    onClick={() => handleOpen(row)}
                   >
                     <span className="min-w-0 truncate text-[13px] font-medium text-foreground">
                       {namingSessionIds[row.session.id]
@@ -371,11 +371,12 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
                       aria-label={isPinned ? 'Unpin session' : 'Pin session'}
                       title={isPinned ? 'Unpin session' : 'Pin session'}
                       className="flex size-4 shrink-0 items-center justify-center rounded-md text-muted-foreground opacity-100 transition-opacity hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:opacity-0 md:focus-visible:opacity-100 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
-                      onClick={() =>
+                      onClick={event => {
+                        event.stopPropagation()
                         useProjectsStore
                           .getState()
                           .toggleRecentSessionPinned(row.session.id)
-                      }
+                      }}
                     >
                       <Pin
                         className={`size-3.5 ${isPinned ? 'fill-current' : ''}`}

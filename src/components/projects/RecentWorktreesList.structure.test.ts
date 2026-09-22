@@ -145,4 +145,11 @@ describe('RecentWorktreesList structure', () => {
     expect(source).toContain('role="separator"')
     expect(source).toContain('border-t border-border/70')
   })
+
+  it('opens a session from the full card without treating the pin as an open action', () => {
+    expect(source).toContain('cursor-pointer flex-col')
+    expect(source).toContain('onClick={() => handleOpen(row)}')
+    expect(source).toContain('onClick={event => {')
+    expect(source).toContain('event.stopPropagation()')
+  })
 })
