@@ -176,6 +176,7 @@ describe('model catalog', () => {
     expect(getCatalogModelOptions(catalog, 'claude')).toEqual(
       expect.arrayContaining([
         { value: 'claude-fable-5-1', label: 'Claude Fable 5.1' },
+        { value: 'claude-opus-5-5', label: 'Claude Opus 5.5' },
         { value: 'claude-opus-4-8[1m]', label: 'Claude Opus 4.8 (1M)' },
       ])
     )
