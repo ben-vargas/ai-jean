@@ -3127,7 +3127,7 @@ export function useUpdateProjectSettings() {
       const serverId = projectRef?.serverId ?? LOCAL_SERVER_ID
       const resourceLinkedProjectIds = linkedProjectIds?.map(id => {
         const reference = parseServerResourceKey(id)
-        if (reference && reference.serverId !== serverId) {
+        if (isNativeApp() && reference && reference.serverId !== serverId) {
           throw new Error(
             'Linked projects must belong to the same Jean instance'
           )
