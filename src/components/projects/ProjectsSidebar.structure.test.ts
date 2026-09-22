@@ -78,6 +78,7 @@ describe('ProjectsSidebar server filter', () => {
     expect(source).toContain('<Plus className="size-3.5" />')
     expect(source).toContain('<GitBranchPlus className="size-3.5" />')
     expect(source).toContain('disabled={!selectedProjectId}')
+    expect(source).toContain('className="flex gap-1 px-3 pt-2"')
     expect(source).toContain('border-transparent bg-transparent')
     expect(source).toContain('searchQuery={searchQuery}')
     expect(source).not.toContain('aria-label="New"')
