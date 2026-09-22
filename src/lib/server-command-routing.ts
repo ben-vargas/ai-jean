@@ -333,6 +333,11 @@ export function decorateServerResult<T>(
       : sessions
     return {
       ...bootstrap,
+      runningSessions: Array.isArray(bootstrap.runningSessions)
+        ? bootstrap.runningSessions.map(sessionId =>
+            scopedId(serverId, sessionId)
+          )
+        : bootstrap.runningSessions,
       worktrees: Array.isArray(bootstrap.worktrees)
         ? bootstrap.worktrees.map(worktree =>
             decorateWorktree(serverId, worktree)

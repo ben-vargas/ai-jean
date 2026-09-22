@@ -192,6 +192,7 @@ import {
   shouldShowCodeReviewLoadingPanel,
   shouldShowReviewFullWidth,
 } from './session-card-utils'
+import { resolveInitialActiveSessionId } from './session-tab-order'
 
 interface ForkSessionToWorktreeResponse {
   worktree: Worktree
@@ -440,15 +441,13 @@ function ChatWindowContent({
     const currentActive = store.activeSessionIds[activeWorktreeId]
     const sessions = sessionsData.sessions
     if (!sessions) return
-    const firstSession = sessions[0]
-
-    // If no active session in store, or it doesn't exist in loaded sessions
-    if (sessions.length > 0 && firstSession) {
-      const sessionExists = sessions.some(s => s.id === currentActive)
-      if (!currentActive || !sessionExists) {
-        const targetSession = sessionsData.active_session_id ?? firstSession.id
-        store.setActiveSession(activeWorktreeId, targetSession)
-      }
+    const targetSession = resolveInitialActiveSessionId(
+      currentActive,
+      sessionsData.active_session_id,
+      sessions.map(session => session.id)
+    )
+    if (targetSession) {
+      store.setActiveSession(activeWorktreeId, targetSession)
     }
   }, [sessionsData, activeWorktreeId, isSessionsFetching, uiStateInitialized])
 

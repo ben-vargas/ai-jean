@@ -273,6 +273,7 @@ export function useProjects() {
 export interface ProjectBootstrap {
   worktrees: Worktree[]
   sessionsByWorktree: Record<string, WorktreeSessions>
+  runningSessions: string[]
 }
 
 /**
@@ -311,13 +312,35 @@ export async function fetchAndSeedProjectBootstrap(
   }
 
   const sessionsByWorktree = bootstrap.sessionsByWorktree ?? {}
+  const projectSessionIds = new Set<string>()
   for (const [worktreeId, sessions] of Object.entries(sessionsByWorktree)) {
+    for (const session of sessions.sessions) projectSessionIds.add(session.id)
     queryClient.setQueryData(chatQueryKeys.sessions(worktreeId), sessions)
     queryClient.setQueryData(
       [...chatQueryKeys.sessions(worktreeId), 'with-counts'],
       sessions
     )
   }
+
+  // A native remote-server switch does not reload App, so reconcile the
+  // running indicators from this server-owned project snapshot here.
+  const runningSessionIds = new Set(bootstrap.runningSessions ?? [])
+  useChatStore.setState(state => {
+    const sendingSessionIds = Object.fromEntries(
+      Object.entries(state.sendingSessionIds).filter(
+        ([sessionId]) => !projectSessionIds.has(sessionId)
+      )
+    )
+    for (const sessionId of runningSessionIds) {
+      if (projectSessionIds.has(sessionId)) sendingSessionIds[sessionId] = true
+    }
+    const currentIds = Object.keys(state.sendingSessionIds)
+    const nextIds = Object.keys(sendingSessionIds)
+    const changed =
+      currentIds.length !== nextIds.length ||
+      nextIds.some(sessionId => !state.sendingSessionIds[sessionId])
+    return changed ? { sendingSessionIds } : state
+  })
 
   logger.info('Project bootstrap loaded', {
     projectId,

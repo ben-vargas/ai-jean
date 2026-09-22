@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  GitBranchPlus,
   Plus,
   AlertTriangle,
   ChevronDown,
@@ -59,6 +60,7 @@ export function ProjectsSidebar() {
     refetch,
   } = useProjects()
   const { setAddProjectDialogOpen } = useProjectsStore()
+  const selectedProjectId = useProjectsStore(state => state.selectedProjectId)
   const sidebarWidth = useSidebarWidth()
   const isMobile = useIsMobile()
   const [backendCheckReady, setBackendCheckReady] = useState(false)
@@ -114,6 +116,12 @@ export function ProjectsSidebar() {
     setAddProjectDialogOpen(true)
   }, [isMobile, setAddProjectDialogOpen])
 
+  const handleNewWorktree = useCallback(() => {
+    if (!selectedProjectId) return
+    closeMobileSidebarIfNeeded(isMobile)
+    useUIStore.getState().setNewWorktreeModalOpen(true)
+  }, [isMobile, selectedProjectId])
+
   const handleOpenSettings = useCallback(() => {
     closeMobileSidebarIfNeeded(isMobile)
     useUIStore.getState().togglePreferences()
@@ -157,14 +165,14 @@ export function ProjectsSidebar() {
                     onChange={event => setSearchQuery(event.target.value)}
                     placeholder="Search projects…"
                     aria-label="Search projects and worktrees"
-                    className="h-8 bg-background/40 pl-7 pr-2 text-xs shadow-none"
+                    className="h-8 border-transparent bg-transparent pl-7 pr-2 text-xs shadow-none focus-visible:border-transparent dark:bg-transparent"
                   />
                 </div>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
                       type="button"
-                      className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                      className="flex size-8 shrink-0 items-center justify-center rounded-md border border-transparent bg-transparent text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
                       onClick={handleNewProject}
                       disabled={!backendCheckReady || setupIncomplete}
                       aria-label="Add project"
@@ -173,6 +181,22 @@ export function ProjectsSidebar() {
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>Add project</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex size-8 shrink-0 items-center justify-center rounded-md border border-transparent bg-transparent text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                      onClick={handleNewWorktree}
+                      disabled={!selectedProjectId}
+                      aria-label="Add worktree to selected project"
+                    >
+                      <GitBranchPlus className="size-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Add worktree to selected project
+                  </TooltipContent>
                 </Tooltip>
               </div>
             </div>

@@ -135,6 +135,7 @@ describe('server command routing', () => {
       decorateServerResult('r1', 'bootstrap_project', {
         worktrees: [{ id: 'w1', project_id: 'p1', name: 'Worktree' }],
         sessionsByWorktree: { w1: { sessions: [{ id: 's1' }] } },
+        runningSessions: ['s1'],
       })
     ).toEqual({
       worktrees: [
@@ -151,6 +152,7 @@ describe('server command routing', () => {
           sessions: [{ id: 'r1:s1', serverId: 'r1', resourceId: 's1' }],
         },
       },
+      runningSessions: ['r1:s1'],
     })
   })
 

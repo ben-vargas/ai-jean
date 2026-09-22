@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { QueryClient } from '@tanstack/react-query'
 
 const invoke = vi.fn()
+const setChatState = vi.fn()
 
 vi.mock('@/lib/transport', () => ({
   invoke: (...args: unknown[]) => invoke(...args),
@@ -22,9 +23,14 @@ vi.mock('@/services/chat', () => ({
   },
 }))
 
+vi.mock('@/store/chat-store', () => ({
+  useChatStore: { setState: (...args: unknown[]) => setChatState(...args) },
+}))
+
 describe('fetchAndSeedProjectBootstrap', () => {
   beforeEach(() => {
     invoke.mockReset()
+    setChatState.mockReset()
   })
 
   it('seeds worktrees and session list caches from one bootstrap_project call', async () => {
@@ -50,6 +56,7 @@ describe('fetchAndSeedProjectBootstrap', () => {
           version: 2,
         },
       },
+      runningSessions: ['s-1'],
     })
 
     const worktrees = await fetchAndSeedProjectBootstrap('proj-1', queryClient)
@@ -58,9 +65,9 @@ describe('fetchAndSeedProjectBootstrap', () => {
       projectId: 'proj-1',
     })
     expect(worktrees).toHaveLength(1)
-    expect(queryClient.getQueryData(projectsQueryKeys.worktrees('proj-1'))).toEqual(
-      worktrees
-    )
+    expect(
+      queryClient.getQueryData(projectsQueryKeys.worktrees('proj-1'))
+    ).toEqual(worktrees)
     expect(
       queryClient.getQueryData(['projects', 'worktree', 'wt-1'])
     ).toMatchObject({
@@ -74,5 +81,32 @@ describe('fetchAndSeedProjectBootstrap', () => {
       worktree_id: 'wt-1',
       sessions: [{ id: 's-1', name: 'Chat' }],
     })
+    const updateSending = setChatState.mock.calls[0]?.[0]
+    expect(
+      updateSending({ sendingSessionIds: { stale: true } }).sendingSessionIds
+    ).toEqual({ stale: true, 's-1': true })
+  })
+
+  it('clears stale running state only for sessions in the bootstrapped project', async () => {
+    const { fetchAndSeedProjectBootstrap } = await import('./projects')
+    invoke.mockResolvedValueOnce({
+      worktrees: [],
+      sessionsByWorktree: {
+        'wt-1': {
+          worktree_id: 'wt-1',
+          sessions: [{ id: 's-1', name: 'Chat' }],
+          version: 2,
+        },
+      },
+      runningSessions: [],
+    })
+
+    await fetchAndSeedProjectBootstrap('proj-1', new QueryClient())
+
+    const updateSending = setChatState.mock.calls[0]?.[0]
+    expect(
+      updateSending({ sendingSessionIds: { 's-1': true, other: true } })
+        .sendingSessionIds
+    ).toEqual({ other: true })
   })
 })

@@ -33,6 +33,21 @@ export function resolveModalSessionId(
 }
 
 /**
+ * Seed the client selection from persisted session data without replacing a
+ * selection that the user already made. A sessions-list refresh can
+ * temporarily omit the running session, so list membership is not evidence
+ * that the current selection is invalid.
+ */
+export function resolveInitialActiveSessionId(
+  currentActiveSessionId: string | undefined,
+  backendActiveSessionId: string | null,
+  sessionIds: readonly string[]
+): string | null {
+  if (currentActiveSessionId) return null
+  return backendActiveSessionId ?? sessionIds[0] ?? null
+}
+
+/**
  * Keep the open session in the tab row when the worktree list is empty or
  * still loading. Chat already renders from the active session id.
  */

@@ -3,6 +3,7 @@ import type { Session } from '@/types/chat'
 import type { SessionCardData } from './session-card-utils'
 import {
   mergeSessionIntoWorktreeSessions,
+  resolveInitialActiveSessionId,
   resolveModalSessionId,
   sessionsForTabBar,
   sortSessionCardsForTabs,
@@ -85,6 +86,29 @@ describe('resolveModalSessionId', () => {
 
   it('returns null when there is no active session and no sessions', () => {
     expect(resolveModalSessionId(undefined, [])).toBeNull()
+  })
+})
+
+describe('resolveInitialActiveSessionId', () => {
+  it('does not replace the selected session when a refresh omits it', () => {
+    expect(
+      resolveInitialActiveSessionId('running', 'other', ['other'])
+    ).toBeNull()
+  })
+
+  it('uses the persisted backend selection when the client has none', () => {
+    expect(
+      resolveInitialActiveSessionId(undefined, 'persisted', [
+        'first',
+        'persisted',
+      ])
+    ).toBe('persisted')
+  })
+
+  it('falls back to the first session when no selection is persisted', () => {
+    expect(
+      resolveInitialActiveSessionId(undefined, null, ['first', 'second'])
+    ).toBe('first')
   })
 })
 

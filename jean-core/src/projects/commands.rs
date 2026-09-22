@@ -1107,6 +1107,7 @@ pub async fn list_worktrees(app: AppHandle, project_id: String) -> Result<Vec<Wo
 pub struct ProjectBootstrap {
     pub worktrees: Vec<Worktree>,
     pub sessions_by_worktree: HashMap<String, crate::chat::types::WorktreeSessions>,
+    pub running_sessions: Vec<String>,
 }
 
 /// One recent prompted session with its owning worktree metadata.
@@ -1271,14 +1272,25 @@ pub async fn bootstrap_project(
         })
         .collect();
 
-    let sessions_by_worktree = futures_util::future::join_all(session_futures)
-        .await
+    let sessions_by_worktree: HashMap<String, crate::chat::types::WorktreeSessions> =
+        futures_util::future::join_all(session_futures)
+            .await
+            .into_iter()
+            .collect();
+
+    let project_session_ids: std::collections::HashSet<&str> = sessions_by_worktree
+        .values()
+        .flat_map(|group| group.sessions.iter().map(|session| session.id.as_str()))
+        .collect();
+    let running_sessions = crate::chat::registry::get_running_sessions()
         .into_iter()
+        .filter(|session_id| project_session_ids.contains(session_id.as_str()))
         .collect();
 
     Ok(ProjectBootstrap {
         worktrees,
         sessions_by_worktree,
+        running_sessions,
     })
 }
 
