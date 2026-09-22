@@ -8637,41 +8637,53 @@ pub async fn resume_session(
             let run_id_clone = run_id.clone();
 
             tauri::async_runtime::spawn(async move {
-                let emit_done = |app: &tauri::AppHandle, sid: &str, wid: &str| {
-                    let _ = app.emit_all(
-                        "chat:done",
-                        &serde_json::json!({ "session_id": sid, "worktree_id": wid, "waiting_for_plan": false }),
-                    );
-                };
-
-                let (grok_session_id, usage, cancelled) = match super::grok::tail_grok_output(
-                    &app_clone,
-                    &session_id_clone,
-                    &worktree_id_clone,
-                    &output_file,
-                    pid,
-                ) {
-                    Ok(response) => (response.session_id, response.usage, response.cancelled),
-                    Err(e) => {
-                        log::error!("Resume Grok tail failed for run: {run_id_clone}, error: {e}");
-                        super::registry::unregister_process(&session_id_clone);
-                        if let Ok(mut writer) =
-                            RunLogWriter::resume(&app_clone, &session_id_clone, &run_id_clone)
-                        {
-                            if let Err(e) = writer.crash() {
-                                log::error!("Failed to mark Grok run as crashed: {e}");
+                let (grok_session_id, usage, cancelled, final_content) =
+                    match super::grok::tail_grok_output(
+                        &app_clone,
+                        &session_id_clone,
+                        &worktree_id_clone,
+                        &output_file,
+                        pid,
+                    ) {
+                        Ok(response) => (
+                            response.session_id,
+                            response.usage,
+                            response.cancelled,
+                            response.content,
+                        ),
+                        Err(e) => {
+                            log::error!(
+                                "Resume Grok tail failed for run: {run_id_clone}, error: {e}"
+                            );
+                            super::registry::unregister_process(&session_id_clone);
+                            if let Ok(mut writer) =
+                                RunLogWriter::resume(&app_clone, &session_id_clone, &run_id_clone)
+                            {
+                                if let Err(e) = writer.crash() {
+                                    log::error!("Failed to mark Grok run as crashed: {e}");
+                                }
                             }
+                            let (event_name, event) =
+                                resumed_tail_error_event(&session_id_clone, &worktree_id_clone, &e);
+                            let _ = app_clone.emit_all(event_name, &event);
+                            return;
                         }
-                        let (event_name, event) =
-                            resumed_tail_error_event(&session_id_clone, &worktree_id_clone, &e);
-                        let _ = app_clone.emit_all(event_name, &event);
-                        return;
-                    }
-                };
+                    };
 
                 super::registry::unregister_process(&session_id_clone);
                 if cancelled {
-                    emit_done(&app_clone, &session_id_clone, &worktree_id_clone);
+                    // tail_grok_output does not emit chat:done for a cancel.
+                    // Send the text already on disk so a client that missed the
+                    // replay still keeps the partial reply.
+                    let _ = app_clone.emit_all(
+                        "chat:done",
+                        &serde_json::json!({
+                            "session_id": session_id_clone,
+                            "worktree_id": worktree_id_clone,
+                            "waiting_for_plan": false,
+                            "content": final_content,
+                        }),
+                    );
                 }
 
                 if let Ok(mut writer) =
@@ -8680,8 +8692,13 @@ pub async fn resume_session(
                     let assistant_message_id = uuid::Uuid::new_v4().to_string();
                     // Do not pass grok id as claude_session_id — complete() only
                     // knows Claude's resume field. Persist grok_session_id below.
-                    if let Err(e) = writer.complete(&assistant_message_id, None, usage.clone()) {
-                        log::error!("Failed to mark resumed Grok run completed: {e}");
+                    let finish = if cancelled {
+                        writer.cancel(Some(&assistant_message_id), None)
+                    } else {
+                        writer.complete(&assistant_message_id, None, usage.clone())
+                    };
+                    if let Err(e) = finish {
+                        log::error!("Failed to finish resumed Grok run: {e}");
                     }
                 }
 

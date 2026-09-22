@@ -2957,7 +2957,10 @@ pub fn run_grok_acp_host_from_args() -> Result<(), String> {
                 }
                 continue;
             }
-            if !cancelling && grok_host_line_should_persist(trimmed) {
+            // Keep session/update lines after abort. The cancel marker is
+            // written first, and Grok may still emit the reply that was already
+            // on screen. Dropping those lines makes that reply vanish on reload.
+            if grok_host_line_should_persist(trimmed) {
                 host_write_output_line(&output, trimmed)?;
             }
             if let Some(resp_id) = value.get("id").and_then(Value::as_i64) {
@@ -3120,6 +3123,9 @@ pub fn tail_grok_output(
     let mut completed = false;
     let mut cancelled = false;
     let mut user_cancelled = false;
+    // After the cancel marker, keep reading until the host goes quiet so reply
+    // text Grok emits while winding down is part of this turn, not dropped.
+    let mut cancel_quiet_deadline: Option<Instant> = None;
     let mut known_tool_outputs: HashMap<String, Option<String>> = HashMap::new();
     // Batch tiny token deltas (~30ms) so streaming markdown re-parses less often
     // and leading spaces between word fragments stay mid-string in each batch.
@@ -3156,9 +3162,11 @@ pub fn tail_grok_output(
             }
 
             if grok_line_is_completion_result(&line) {
-                completed = true;
                 if grok_result_marker_is_cancelled(&line) {
                     user_cancelled = true;
+                    cancel_quiet_deadline = Some(Instant::now() + Duration::from_millis(400));
+                } else {
+                    completed = true;
                 }
             }
 
@@ -3251,6 +3259,14 @@ pub fn tail_grok_output(
             }
         }
 
+        if let Some(deadline) = cancel_quiet_deadline {
+            if got_lines {
+                cancel_quiet_deadline = Some(Instant::now() + Duration::from_millis(200));
+            } else if Instant::now() >= deadline {
+                completed = true;
+            }
+        }
+
         if completed {
             break;
         }
@@ -3273,6 +3289,12 @@ pub fn tail_grok_output(
             let until_flush = deadline.saturating_duration_since(Instant::now());
             if until_flush < sleep_for {
                 sleep_for = until_flush;
+            }
+        }
+        if let Some(deadline) = cancel_quiet_deadline {
+            let until_cancel = deadline.saturating_duration_since(Instant::now());
+            if until_cancel < sleep_for {
+                sleep_for = until_cancel;
             }
         }
         std::thread::sleep(sleep_for);
@@ -6628,6 +6650,44 @@ Ship the feature end-to-end with tests and clear handoff notes for YOLO.
         let message = parse_grok_run_to_message(&lines, &run).unwrap();
         assert_eq!(message.content, "Survived restart");
         assert_eq!(message.id, "a1");
+    }
+
+    #[test]
+    fn parse_grok_run_to_message_keeps_text_when_cancel_marker_follows() {
+        let lines = vec![
+            r#"{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Partial reply before cancel"}}}}"#.to_string(),
+            r#"{"type":"result","session_id":"s","cancelled":true}"#.to_string(),
+        ];
+        let run = RunEntry {
+            run_id: "run-cancel".to_string(),
+            user_message_id: "u1".to_string(),
+            user_message: "hi".to_string(),
+            model: Some("grok/grok-4.7".to_string()),
+            execution_mode: Some("yolo".to_string()),
+            thinking_level: None,
+            effort_level: None,
+            backend: Some(super::super::types::Backend::Grok),
+            custom_profile_name: None,
+            started_at: 1,
+            ended_at: Some(2),
+            status: super::super::types::RunStatus::Cancelled,
+            assistant_message_id: Some("a-cancel".to_string()),
+            cancelled: true,
+            recovered: true,
+            claude_session_id: None,
+            pid: None,
+            usage: None,
+            codex_thread_id: None,
+            codex_turn_id: None,
+            cursor_chat_id: None,
+            grok_session_id: Some("s".to_string()),
+            kimi_session_id: None,
+            antigravity_session_id: None,
+            checkpoint_id: None,
+        };
+        let message = parse_grok_run_to_message(&lines, &run).unwrap();
+        assert_eq!(message.content, "Partial reply before cancel");
+        assert!(message.cancelled);
     }
 
     #[test]

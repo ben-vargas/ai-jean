@@ -1497,7 +1497,7 @@ pub fn load_session_messages_window(
                         recovered: run.recovered,
                         usage: run.usage.clone(),
                     };
-                    if run.status == RunStatus::Running {
+                    if matches!(run.status, RunStatus::Running | RunStatus::Resumable) {
                         placeholder.id = format!("running-{}", run.run_id);
                     }
                     messages.push(placeholder);
@@ -1575,7 +1575,7 @@ pub fn load_session_messages_window(
             }
             let run_backend = run.backend.as_ref().unwrap_or(&metadata.backend);
             assistant_msg.session_id = session_id.to_string();
-            if run.status == RunStatus::Running {
+            if matches!(run.status, RunStatus::Running | RunStatus::Resumable) {
                 assistant_msg.id = format!("running-{}", run.run_id);
             } else if run.status == RunStatus::Cancelled && run.assistant_message_id.is_none() {
                 assistant_msg.id = format!("cancelled-{}", run.run_id);
@@ -1660,6 +1660,22 @@ mod tests {
             antigravity_session_id: None,
             checkpoint_id: None,
         }
+    }
+
+    #[test]
+    fn cancelled_grok_result_is_not_a_successful_result() {
+        assert!(jsonl_line_is_cancelled_result(
+            r#"{"type":"result","session_id":"s","cancelled":true}"#
+        ));
+        assert!(jsonl_line_is_cancelled_result(
+            r#"{"type": "result", "cancelled": true}"#
+        ));
+        assert!(!jsonl_line_is_cancelled_result(
+            r#"{"type":"result","session_id":"s"}"#
+        ));
+        assert!(!jsonl_line_is_cancelled_result(
+            r#"{"type":"error","error":"rate limit"}"#
+        ));
     }
 
     #[test]
@@ -2665,8 +2681,13 @@ pub fn recover_incomplete_runs(app: &tauri::AppHandle) -> Result<Vec<RecoveredRu
                         run.pid
                     );
                 } else {
-                    // Process is dead - check if it completed successfully
+                    // Process is dead - check if it completed successfully.
+                    // A Grok cancel marker is `type:result` plus `cancelled:true`.
+                    // That is not a successful completion: keep the partial reply
+                    // and mark the run cancelled instead of "content was not captured".
                     let completed = jsonl_has_result_line(app, &session_id, &run.run_id);
+                    let cancelled_result = !completed
+                        && jsonl_has_cancelled_result_line(app, &session_id, &run.run_id);
 
                     if completed {
                         run.status = RunStatus::Completed;
@@ -2713,6 +2734,9 @@ pub fn recover_incomplete_runs(app: &tauri::AppHandle) -> Result<Vec<RecoveredRu
 
                         modified = true;
                         continue;
+                    } else if cancelled_result {
+                        run.status = RunStatus::Cancelled;
+                        run.cancelled = true;
                     } else {
                         run.status = RunStatus::Crashed;
                     }
@@ -2785,10 +2809,14 @@ pub fn jsonl_has_result_line(app: &tauri::AppHandle, session_id: &str, run_id: &
 
     // Prefer error over result: legacy Grok ACP hosts wrote both, and salvaging
     // those as completed produced empty "content was not captured" runs (#580).
+    // A cancelled result is not success either — see jsonl_line_is_cancelled_result.
     let mut has_result = false;
     let mut has_error = false;
     for line in reader.lines() {
         if let Ok(line) = line {
+            if jsonl_line_is_cancelled_result(&line) {
+                continue;
+            }
             // Compact JSON from serde_json::json! uses no space after `:`.
             if line.contains("\"type\":\"error\"") {
                 has_error = true;
@@ -2799,6 +2827,53 @@ pub fn jsonl_has_result_line(app: &tauri::AppHandle, session_id: &str, run_id: &
         }
     }
     has_result && !has_error
+}
+
+/// True when the run log ends in a Grok/Kimi cancel marker rather than success.
+pub fn jsonl_has_cancelled_result_line(
+    app: &tauri::AppHandle,
+    session_id: &str,
+    run_id: &str,
+) -> bool {
+    let session_dir = match get_session_dir(app, session_id) {
+        Ok(d) => d,
+        Err(_) => return false,
+    };
+    let jsonl_path = session_dir.join(format!("{run_id}.jsonl"));
+    let file = match File::open(&jsonl_path) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+    let file_len = file.metadata().map(|m| m.len()).unwrap_or(0);
+    let reader = if file_len > 8192 {
+        use std::io::{Seek, SeekFrom};
+        let mut f = file;
+        let _ = f.seek(SeekFrom::End(-8192));
+        BufReader::new(f)
+    } else {
+        BufReader::new(file)
+    };
+    let mut saw_cancelled = false;
+    let mut saw_success = false;
+    for line in reader.lines().flatten() {
+        if jsonl_line_is_cancelled_result(&line) {
+            saw_cancelled = true;
+        } else if line.contains("\"type\":\"result\"") {
+            saw_success = true;
+        }
+    }
+    saw_cancelled && !saw_success
+}
+
+/// Cancel markers are compact (`"cancelled":true`) or pretty (`"cancelled": true`).
+pub(crate) fn jsonl_line_is_cancelled_result(line: &str) -> bool {
+    if !line.contains("\"type\":\"result\"") && !line.contains("\"type\": \"result\"") {
+        return false;
+    }
+    line.contains("\"cancelled\":true")
+        || line.contains("\"cancelled\": true")
+        || line.contains("\"canceled\":true")
+        || line.contains("\"canceled\": true")
 }
 
 /// Extract the Claude session ID from a run's JSONL file.

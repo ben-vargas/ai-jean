@@ -113,7 +113,10 @@ import {
   GROK_MODEL_OPTIONS,
   ANTIGRAVITY_MODEL_OPTIONS,
 } from '@/components/chat/toolbar/toolbar-options'
-import { formatOpencodeModelLabel } from '@/components/chat/toolbar/toolbar-utils'
+import {
+  formatGrokModelOptionLabel,
+  formatOpencodeModelLabel,
+} from '@/components/chat/toolbar/toolbar-utils'
 import {
   getCatalogModelOptions,
   useModelCatalog,
@@ -565,10 +568,13 @@ export function MagicModal() {
     const models = availableGrokModels?.length
       ? availableGrokModels.map(model => ({
           value: `grok/${model.id}`,
-          label: model.label || model.id,
+          label: formatGrokModelOptionLabel(`grok/${model.id}`, model.label),
         }))
       : GROK_MODEL_OPTIONS
-    return models
+    return models.map(option => ({
+      ...option,
+      label: formatGrokModelOptionLabel(option.value, option.label),
+    }))
   }, [availableGrokModels])
   const kimiModelOptions = useMemo(() => {
     if (!availableKimiModels?.length) {

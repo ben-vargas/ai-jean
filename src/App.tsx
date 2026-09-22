@@ -692,6 +692,11 @@ function App() {
       })
 
       for (const { sessionId, message } of runningSnapshotMessages) {
+        // Only lift the snapshot into the live stream when this client already
+        // knows the turn is sending. A Resumable run (Jean restarted, host
+        // still alive) is not in that set yet. Leave its partial reply in the
+        // transcript until resume starts, or the text disappears.
+        if (!runningSendingIds[sessionId]) continue
         hydrateRunningSnapshot(sessionId, message, {
           allowWhileSending: true,
           dedupeReplayedOutput: true,
