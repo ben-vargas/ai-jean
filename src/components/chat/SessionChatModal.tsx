@@ -52,6 +52,7 @@ import {
 } from '@/services/chat'
 import { resolveBackendCliPath } from '@/services/cli-binary'
 import { usePreferences } from '@/services/preferences'
+import { parseServerResourceKey } from '@/lib/server-resource'
 import { usePackageScripts, type PackageScript } from '@/services/projects'
 import { useGitHubPRs } from '@/services/github'
 import {
@@ -250,7 +251,8 @@ export function SessionChatModal({
     [missingActiveSession, sessions]
   )
   const showSessionTabs = tabSessions.length > 0 || !!currentSessionId
-  const { data: preferences } = usePreferences()
+  const serverId = parseServerResourceKey(worktreeId)?.serverId
+  const { data: preferences } = usePreferences(serverId)
   const { data: packageScripts = [] } = usePackageScripts(worktreePath)
   const modalTerminalDockMode = useTerminalStore(
     state => state.modalTerminalDockMode

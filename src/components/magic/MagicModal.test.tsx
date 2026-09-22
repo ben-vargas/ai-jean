@@ -42,6 +42,7 @@ const mocks = vi.hoisted(() => {
     activeWorktreePath: null as string | null,
     selectedWorktreeId: 'wt-1',
     installedBackendsOptions: vi.fn(),
+    preferencesServerId: vi.fn(),
     worktreePaths: {} as Record<string, string>,
     worktree,
   }
@@ -187,22 +188,25 @@ vi.mock('@/services/github', () => ({
 }))
 
 vi.mock('@/services/preferences', () => ({
-  usePreferences: () => ({
-    data: {
-      default_backend: 'claude',
-      selected_model: 'claude-opus-4-8[1m]',
-      selected_codex_model: 'gpt-5.5',
-      magic_prompt_models: {},
-      magic_prompt_efforts: {},
-      magic_prompt_modes: {},
-      magic_prompts: {
-        resolve_conflicts: 'Resolve and finish.',
+  usePreferences: (serverId?: string) => {
+    mocks.preferencesServerId(serverId)
+    return {
+      data: {
+        default_backend: 'claude',
+        selected_model: 'claude-opus-4-8[1m]',
+        selected_codex_model: 'gpt-5.5',
+        magic_prompt_models: {},
+        magic_prompt_efforts: {},
+        magic_prompt_modes: {},
+        magic_prompts: {
+          resolve_conflicts: 'Resolve and finish.',
+        },
+        magic_prompt_backends: {
+          resolve_conflicts_backend: 'codex',
+        },
       },
-      magic_prompt_backends: {
-        resolve_conflicts_backend: 'codex',
-      },
-    },
-  }),
+    }
+  },
 }))
 
 vi.mock('@/services/opencode-cli', () => ({
@@ -295,6 +299,7 @@ describe('MagicModal manual PR link', () => {
     expect(mocks.installedBackendsOptions).toHaveBeenCalledWith({
       serverId: 'remote-1',
     })
+    expect(mocks.preferencesServerId).toHaveBeenCalledWith('remote-1')
   })
 
   it('renders touch-friendly grouped actions for the mobile menu', () => {

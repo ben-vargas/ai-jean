@@ -90,7 +90,6 @@ export function ResolveConflictsDialog({
     activeWorktreeId ??
     sessionChatModalWorktreeId
   const { data: worktree } = useWorktree(selectedWorktreeId)
-  const { data: preferences } = usePreferences()
   const { data: projects } = useProjects()
   const project = worktree
     ? projects?.find(p => p.id === worktree.project_id)
@@ -98,20 +97,25 @@ export function ResolveConflictsDialog({
   const targetServerId = selectedWorktreeId
     ? parseServerResourceKey(selectedWorktreeId)?.serverId
     : undefined
+  const { data: preferences } = usePreferences(targetServerId)
   const { installedBackends } = useInstalledBackends({
     serverId: targetServerId,
   })
   const { data: availableOpencodeModels } = useAvailableOpencodeModels({
     enabled: installedBackends.includes('opencode'),
+    serverId: targetServerId,
   })
   const { data: availableGrokModels } = useAvailableGrokModels({
     enabled: installedBackends.includes('grok'),
+    serverId: targetServerId,
   })
   const { data: availableKimiModels } = useAvailableKimiModels({
     enabled: installedBackends.includes('kimi'),
+    serverId: targetServerId,
   })
   const { data: availableAntigravityModels } = useAvailableAntigravityModels({
     enabled: installedBackends.includes('antigravity'),
+    serverId: targetServerId,
   })
   const { data: modelCatalog } = useModelCatalog()
 

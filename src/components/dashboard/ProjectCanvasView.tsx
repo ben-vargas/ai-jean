@@ -965,7 +965,7 @@ export function ProjectCanvasView({
   projectId,
   project,
 }: ProjectCanvasViewProps) {
-  const { data: preferences } = usePreferences()
+  const { data: preferences } = usePreferences(project.serverId)
   const worktreeSortMode = useProjectsStore(
     state =>
       state.projectCanvasSettings[projectId]?.worktreeSortMode ?? 'created'
@@ -2831,9 +2831,7 @@ export function ProjectCanvasView({
 
   // Keyboard navigation - disable when any modal/dialog is open
   const isModalOpen =
-    !!selectedWorktreeModal ||
-    worktreeLabelModalOpen ||
-    !!labelDeleteTarget
+    !!selectedWorktreeModal || worktreeLabelModalOpen || !!labelDeleteTarget
   const { cardRefs } = useCanvasKeyboardNav({
     cards: flatCards,
     selectedIndex,

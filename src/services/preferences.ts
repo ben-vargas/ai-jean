@@ -67,6 +67,47 @@ export const preferencesQueryKeys = {
       : ([...preferencesQueryKeys.all, 'server', serverId] as const),
 }
 
+export async function loadPreferencesForServer(
+  serverId: ServerId
+): Promise<AppPreferences> {
+  if (!hasBackendTransport()) {
+    logger.debug('Not in Tauri context, using default preferences')
+    return defaultPreferences
+  }
+
+  const preferences =
+    serverId === LOCAL_SERVER_ID
+      ? await invoke<AppPreferences>('load_preferences')
+      : (
+          await invokeForServer<ServerPreferencesEnvelope>(
+            serverId,
+            'get_server_preferences'
+          )
+        ).preferences
+  const completePreferences = {
+    ...defaultPreferences,
+    ...preferences,
+  } as AppPreferences
+  const migratedBindings = migrateKeybindings(completePreferences.keybindings)
+  const merged = { ...DEFAULT_KEYBINDINGS, ...migratedBindings }
+  const validKeys = new Set(Object.keys(DEFAULT_KEYBINDINGS))
+  const keybindings: KeybindingsMap = {}
+  for (const [key, value] of Object.entries(merged)) {
+    if (validKeys.has(key)) keybindings[key] = value
+  }
+  const normalized = {
+    ...completePreferences,
+    selected_model: normalizeClaudeModel(completePreferences.selected_model, {
+      preserveProviderAliases: Boolean(completePreferences.default_provider),
+    }),
+    selected_codex_model: normalizeCodexModel(
+      completePreferences.selected_codex_model
+    ),
+    keybindings,
+  }
+  return { ...normalized, ...readClientPreferences(normalized) }
+}
+
 export function useServerPreferences() {
   const serverId = useSettingsTargetServerId()
   return useQuery({
@@ -118,57 +159,11 @@ export function usePreferences(serverIdOverride?: ServerId) {
   return useQuery({
     queryKey: preferencesQueryKeys.preferences(serverId),
     queryFn: async (): Promise<AppPreferences> => {
-      // Return defaults when running outside Tauri (e.g., bun run dev in browser)
-      if (!hasBackendTransport()) {
-        logger.debug('Not in Tauri context, using default preferences')
-        return defaultPreferences
-      }
-
       try {
         logger.debug('Loading preferences from backend')
-        const preferences =
-          serverId === LOCAL_SERVER_ID
-            ? await invoke<AppPreferences>('load_preferences')
-            : (
-                await invokeForServer<ServerPreferencesEnvelope>(
-                  serverId,
-                  'get_server_preferences'
-                )
-              ).preferences
+        const preferences = await loadPreferencesForServer(serverId)
         logger.info('Preferences loaded successfully', { preferences })
-        // Migrate old defaults and merge with new defaults
-        const completePreferences = {
-          ...defaultPreferences,
-          ...preferences,
-        } as AppPreferences
-        const migratedBindings = migrateKeybindings(
-          completePreferences.keybindings
-        )
-        const merged = { ...DEFAULT_KEYBINDINGS, ...migratedBindings }
-        // Drop stale keys (renamed/removed actions) that persist in saved prefs
-        const validKeys = new Set(Object.keys(DEFAULT_KEYBINDINGS))
-        const keybindings: KeybindingsMap = {}
-        for (const [key, value] of Object.entries(merged)) {
-          if (validKeys.has(key)) keybindings[key] = value
-        }
-        const normalized = {
-          ...completePreferences,
-          selected_model: normalizeClaudeModel(
-            completePreferences.selected_model,
-            {
-              // Keep opus/sonnet/haiku when a custom CLI provider is the default
-              // so Settings → Claude can show/persist provider-routed models.
-              preserveProviderAliases: Boolean(
-                completePreferences.default_provider
-              ),
-            }
-          ),
-          selected_codex_model: normalizeCodexModel(
-            completePreferences.selected_codex_model
-          ),
-          keybindings,
-        }
-        return { ...normalized, ...readClientPreferences(normalized) }
+        return preferences
       } catch (error) {
         // Return defaults if preferences file doesn't exist yet
         logger.warn('Failed to load preferences, using defaults', { error })

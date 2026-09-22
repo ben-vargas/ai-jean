@@ -506,15 +506,19 @@ export function MagicModal() {
   })
   const { data: availableOpencodeModels } = useAvailableOpencodeModels({
     enabled: installedBackends.includes('opencode'),
+    serverId: targetServerId,
   })
   const { data: availableGrokModels } = useAvailableGrokModels({
     enabled: installedBackends.includes('grok'),
+    serverId: targetServerId,
   })
   const { data: availableKimiModels } = useAvailableKimiModels({
     enabled: installedBackends.includes('kimi'),
+    serverId: targetServerId,
   })
   const { data: availableAntigravityModels } = useAvailableAntigravityModels({
     enabled: installedBackends.includes('antigravity'),
+    serverId: targetServerId,
   })
   const { data: modelCatalog } = useModelCatalog()
 
@@ -549,7 +553,7 @@ export function MagicModal() {
 
   const queryClient = useQueryClient()
   const selectedProjectId = useProjectsStore(state => state.selectedProjectId)
-  const { data: preferences } = usePreferences()
+  const { data: preferences } = usePreferences(targetServerId)
   const { data: projects } = useProjects()
   const project = worktree
     ? projects?.find(p => p.id === worktree.project_id)

@@ -160,8 +160,12 @@ export function useGrokUsage(options?: { enabled?: boolean }) {
   })
 }
 
-export function useAvailableGrokModels(options?: { enabled?: boolean }) {
-  const serverId = useOptionalSettingsTargetServerId()
+export function useAvailableGrokModels(options?: {
+  enabled?: boolean
+  serverId?: string
+}) {
+  const settingsServerId = useOptionalSettingsTargetServerId()
+  const serverId = options?.serverId ?? settingsServerId
   return useQuery({
     queryKey: [...grokCliQueryKeys.models(), serverId ?? 'local'],
     queryFn: async (): Promise<GrokModelInfo[]> => {
