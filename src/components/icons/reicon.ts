@@ -63,7 +63,6 @@ export {
   InfoCircle,
   Key,
   Keyboard,
-  LampCharge,
   Layers,
   Layout,
   Lightbulb,
@@ -151,7 +150,7 @@ export { BellAlert as BellDot } from 'reicon-react'
 export { TextBlock as Blocks } from 'reicon-react'
 export { Bookmark as BookmarkPlus } from 'reicon-react'
 export { Cpu as Bot } from 'reicon-react'
-export { LampCharge as Brain } from 'reicon-react'
+export { BrainIcon as Brain } from './BrainIcon'
 export { Link as Cable } from 'reicon-react'
 export { Calendar as CalendarClock } from 'reicon-react'
 export { CheckCircle as CheckCircle2 } from 'reicon-react'

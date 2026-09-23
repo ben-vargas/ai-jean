@@ -65,7 +65,11 @@ import type {
   ContentBlock,
   ChatMessage,
 } from '@/types/chat'
-import { persistEnqueue, saveCancelledMessage } from '@/services/chat'
+import {
+  persistEnqueue,
+  saveCancelledMessage,
+  upsertTurnAssistantMessage,
+} from '@/services/chat'
 import {
   applySessionSettingToSession,
   type SessionSettingKey,
@@ -88,26 +92,6 @@ import {
 
 interface UseStreamingEventsParams {
   queryClient: QueryClient
-}
-
-/**
- * Upsert an optimistic assistant message into the session's message list.
- * If the last message is already an assistant message (e.g. from a cancelled run),
- * replace it instead of appending — prevents duplicate assistant messages when
- * the user cancels and resends.
- */
-function upsertAssistantMessage(
-  messages: Session['messages'],
-  newMsg: Session['messages'][number]
-): Session['messages'] {
-  const last = messages[messages.length - 1]
-  if (last?.role === 'assistant') {
-    // Replace the trailing assistant message
-    const updated = [...messages]
-    updated[updated.length - 1] = newMsg
-    return updated
-  }
-  return [...messages, newMsg]
 }
 
 function getTextContentFromBlocks(
@@ -1202,7 +1186,7 @@ export default function useStreamingEvents({
               if (!old) return old
               return {
                 ...old,
-                messages: upsertAssistantMessage(old.messages, {
+                messages: upsertTurnAssistantMessage(old.messages, {
                   id: messageId,
                   session_id: sessionId,
                   role: 'assistant' as const,
@@ -1305,7 +1289,7 @@ export default function useStreamingEvents({
               if (!old) return old
               return {
                 ...old,
-                messages: upsertAssistantMessage(old.messages, {
+                messages: upsertTurnAssistantMessage(old.messages, {
                   id: planMessageId as string,
                   session_id: sessionId,
                   role: 'assistant' as const,
@@ -1473,7 +1457,7 @@ export default function useStreamingEvents({
               }
               return {
                 ...old,
-                messages: upsertAssistantMessage(old.messages, {
+                messages: upsertTurnAssistantMessage(old.messages, {
                   id: messageId,
                   session_id: sessionId,
                   role: 'assistant' as const,

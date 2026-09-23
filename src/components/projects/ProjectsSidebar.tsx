@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   GitBranchPlus,
+  FolderPlus,
   Plus,
   AlertTriangle,
   ChevronDown,
@@ -26,7 +27,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { useProjects } from '@/services/projects'
+import { useCreateFolder, useProjects } from '@/services/projects'
 import { useProjectsStore } from '@/store/projects-store'
 import { useUIStore } from '@/store/ui-store'
 import { useIsMobile } from '@/hooks/use-mobile'
@@ -60,6 +61,7 @@ export function ProjectsSidebar() {
     refetch,
   } = useProjects()
   const { setAddProjectDialogOpen } = useProjectsStore()
+  const createFolder = useCreateFolder()
   const selectedProjectId = useProjectsStore(state => state.selectedProjectId)
   const sidebarWidth = useSidebarWidth()
   const isMobile = useIsMobile()
@@ -116,6 +118,11 @@ export function ProjectsSidebar() {
     setAddProjectDialogOpen(true)
   }, [isMobile, setAddProjectDialogOpen])
 
+  const handleNewFolder = useCallback(() => {
+    setSearchQuery('')
+    createFolder.mutate({ name: 'New Folder' })
+  }, [createFolder])
+
   const handleNewWorktree = useCallback(() => {
     if (!selectedProjectId) return
     closeMobileSidebarIfNeeded(isMobile)
@@ -168,20 +175,39 @@ export function ProjectsSidebar() {
                     className="h-8 border-transparent bg-transparent pl-7 pr-2 text-xs shadow-none focus-visible:border-transparent dark:bg-transparent"
                   />
                 </div>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className="flex size-8 shrink-0 items-center justify-center rounded-md border border-transparent bg-transparent text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
-                      onClick={handleNewProject}
+                <DropdownMenu>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="flex size-8 shrink-0 items-center justify-center rounded-md border border-transparent bg-transparent text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          aria-label="Add project or folder"
+                        >
+                          <Plus className="size-3.5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>Add project or folder</TooltipContent>
+                  </Tooltip>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onSelect={handleNewProject}
                       disabled={!backendCheckReady || setupIncomplete}
                       aria-label="Add project"
                     >
                       <Plus className="size-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Add project</TooltipContent>
-                </Tooltip>
+                      Add project
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={handleNewFolder}
+                      disabled={createFolder.isPending}
+                    >
+                      <FolderPlus className="size-3.5" />
+                      New folder
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button

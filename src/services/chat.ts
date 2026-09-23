@@ -1766,6 +1766,32 @@ export function useSetActiveSession() {
 // ============================================================================
 
 /**
+ * Put an assistant reply into the current turn: replace the assistant message
+ * that follows the last user message, or append one. Never replace a reply
+ * from an earlier turn — chat:done and the invoke response can each arrive
+ * first, and either can be missing.
+ */
+export function upsertTurnAssistantMessage(
+  messages: ChatMessage[],
+  reply: ChatMessage
+): ChatMessage[] {
+  let lastUserIdx = -1
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.role === 'user') {
+      lastUserIdx = i
+      break
+    }
+  }
+  const turnReplyIdx = messages.findIndex(
+    (message, index) => index > lastUserIdx && message.role === 'assistant'
+  )
+  if (turnReplyIdx < 0) return [...messages, reply]
+  const updated = [...messages]
+  updated[turnReplyIdx] = reply
+  return updated
+}
+
+/**
  * Hook to send a message to Claude (session-based)
  */
 export function useSendMessage() {
@@ -1939,9 +1965,13 @@ export function useSendMessage() {
         }
       )
 
-      return { previous, worktreeId }
+      return {
+        previous,
+        worktreeId,
+        sendStartedAt: useChatStore.getState().sendStartedAt[sessionId],
+      }
     },
-    onSuccess: (response, { sessionId, worktreeId }) => {
+    onSuccess: (response, { sessionId, worktreeId }, context) => {
       console.log(
         `[SendMutation] onSuccess sessionId=${sessionId} cancelled=${response.cancelled}`,
         {
@@ -1959,36 +1989,42 @@ export function useSendMessage() {
         return
       }
 
-      const finalResponse = response
+      // A queued prompt can start before this invoke resolves. Then the cache
+      // tail and the running state belong to the new turn — only refetch.
+      const store = useChatStore.getState()
+      const isSameSend =
+        store.sendStartedAt[sessionId] === context?.sendStartedAt
+      if (store.sendingSessionIds[sessionId] && !isSameSend) {
+        queryClient.invalidateQueries({
+          queryKey: chatQueryKeys.session(sessionId),
+        })
+        queryClient.invalidateQueries({
+          queryKey: chatQueryKeys.sessions(worktreeId),
+        })
+        return
+      }
 
-      // Replace the optimistic assistant message with the complete one from backend
-      // This fixes a race condition where chat:done creates an optimistic message
-      // with incomplete content_blocks (missing Edit/Read/Write tool blocks)
+      // Replace this turn's optimistic assistant message (from chat:done) with
+      // the complete one from the backend, which has all content_blocks.
       queryClient.setQueryData<Session>(
         chatQueryKeys.session(sessionId),
-        old => {
-          if (!old) return old
-
-          // Find the last assistant message (the optimistic one from chat:done)
-          // and replace it with the complete message from the backend
-          let lastAssistantIdx = -1
-          for (let i = old.messages.length - 1; i >= 0; i--) {
-            if (old.messages[i]?.role === 'assistant') {
-              lastAssistantIdx = i
-              break
-            }
-          }
-
-          if (lastAssistantIdx >= 0) {
-            const newMessages = [...old.messages]
-            newMessages[lastAssistantIdx] = finalResponse
-            return { ...old, messages: newMessages }
-          }
-
-          // If no assistant message found, add the response
-          return { ...old, messages: [...old.messages, finalResponse] }
-        }
+        old =>
+          old
+            ? {
+                ...old,
+                messages: upsertTurnAssistantMessage(old.messages, response),
+              }
+            : old
       )
+
+      // The invoke response is terminal too. If chat:done was lost (e.g. a
+      // dropped event), finish the turn here so it does not stay running.
+      if (store.sendingSessionIds[sessionId]) {
+        store.completeSession(sessionId)
+        queryClient.invalidateQueries({
+          queryKey: chatQueryKeys.session(sessionId),
+        })
+      }
 
       // Invalidate sessions list to update any metadata
       queryClient.invalidateQueries({
