@@ -118,6 +118,8 @@ describe('RecentWorktreesList structure', () => {
   })
 
   it('pins sessions above recent rows and keeps the pin visible on small screens', () => {
+    expect(source).toContain('<PinTack')
+    expect(source).toContain("weight={isPinned ? 'Filled' : 'Outline'}")
     expect(source).toContain('toggleRecentSessionPinned(row.session.id)')
     expect(source).toContain('pinned.has(row.session.id)')
     expect(source).toContain('aPinned === bPinned ? 0 : aPinned ? -1 : 1')

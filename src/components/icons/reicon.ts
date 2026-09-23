@@ -94,6 +94,7 @@ export {
   Pen,
   PenLine,
   Pin,
+  PinTack,
   Play,
   Plug,
   Plus,

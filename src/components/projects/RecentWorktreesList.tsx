@@ -4,7 +4,12 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query'
-import { AlertTriangle, BellDot, Pin, Plus } from '@/components/icons/reicon'
+import {
+  AlertTriangle,
+  BellDot,
+  PinTack,
+  Plus,
+} from '@/components/icons/reicon'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { mergeSessionIntoWorktreeSessions } from '@/components/chat/session-tab-order'
 import { useChatStore } from '@/store/chat-store'
@@ -378,8 +383,9 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
                           .toggleRecentSessionPinned(row.session.id)
                       }}
                     >
-                      <Pin
-                        className={`size-3.5 ${isPinned ? 'fill-current' : ''}`}
+                      <PinTack
+                        size={14}
+                        weight={isPinned ? 'Filled' : 'Outline'}
                       />
                     </button>
                     <span className="flex gap-1 text-[10px] font-medium tabular-nums">

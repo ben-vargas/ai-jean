@@ -29,6 +29,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu'
 import { cn } from '@/lib/utils'
 import {
   isProjectTreeDragData,
@@ -388,6 +394,7 @@ export function ProjectTree({
   const [overFolderId, setOverFolderId] = useState<string | null>(null)
   const [isOverRoot, setIsOverRoot] = useState(false)
   const [insertBeforeId, setInsertBeforeId] = useState<string | null>(null)
+  const [foldersSectionCollapsed, setFoldersSectionCollapsed] = useState(false)
   const latestDropTargetRef = useRef<{
     targetId: string | null
     instruction: Instruction | null
@@ -419,9 +426,7 @@ export function ProjectTree({
     () => projects.flatMap(p => (isFolder(p) ? [p.id] : [])),
     [projects]
   )
-  const areAllFoldersExpanded = allFolderIds.every(id =>
-    expandedFolderIds.has(id)
-  )
+  const showFolders = !foldersSectionCollapsed || Boolean(searchQuery)
   const clearDragState = useCallback(() => {
     setActiveId(null)
     setOverFolderId(null)
@@ -764,53 +769,58 @@ export function ProjectTree({
       onDragEnd={handleNativeTreeDragEnd}
     >
       {rootFolders.length > 0 && (
-        <div className="group/header flex items-center justify-between pl-3 pr-2 pb-1 pt-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-            Folders
-          </span>
-          <Tooltip>
-            <TooltipTrigger asChild>
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            <div className="group/header flex items-center justify-between pl-3 pr-2 pb-1 pt-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/50">
+                Folders
+              </span>
               <button
                 type="button"
                 className="flex size-4 shrink-0 items-center justify-center rounded opacity-50 hover:bg-accent-foreground/10 hover:opacity-100"
-                onClick={() =>
-                  areAllFoldersExpanded
-                    ? collapseAllFolders()
-                    : expandAllFolders(allFolderIds)
-                }
-                aria-label={
-                  areAllFoldersExpanded
-                    ? 'Collapse all folders'
-                    : 'Expand all folders'
-                }
+                onClick={() => setFoldersSectionCollapsed(value => !value)}
+                aria-label={showFolders ? 'Hide folders' : 'Show folders'}
+                aria-expanded={showFolders}
+                disabled={Boolean(searchQuery)}
               >
-                {areAllFoldersExpanded ? (
+                {showFolders ? (
                   <ChevronUp className="size-3.5" />
                 ) : (
                   <ChevronDown className="size-3.5" />
                 )}
               </button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {areAllFoldersExpanded ? 'Collapse all' : 'Expand all'}
-            </TooltipContent>
-          </Tooltip>
-        </div>
+            </div>
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem
+              onClick={() => {
+                setFoldersSectionCollapsed(false)
+                expandAllFolders(allFolderIds)
+              }}
+            >
+              Expand all folders
+            </ContextMenuItem>
+            <ContextMenuItem onClick={collapseAllFolders}>
+              Collapse all folders
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
       )}
-      {rootFolders.map(item => (
-        <SortableItem
-          key={item.id}
-          item={item}
-          allProjects={projects}
-          depth={0}
-          isOverFolder={overFolderId === item.id}
-          expandedFolderIds={expandedFolderIds}
-          overFolderId={overFolderId}
-          insertBeforeId={insertBeforeId}
-          activeId={activeId}
-          searchQuery={searchQuery}
-        />
-      ))}
+      {showFolders &&
+        rootFolders.map(item => (
+          <SortableItem
+            key={item.id}
+            item={item}
+            allProjects={projects}
+            depth={0}
+            isOverFolder={overFolderId === item.id}
+            expandedFolderIds={expandedFolderIds}
+            overFolderId={overFolderId}
+            insertBeforeId={insertBeforeId}
+            activeId={activeId}
+            searchQuery={searchQuery}
+          />
+        ))}
       {hasBothTypes && (
         <div className="px-3 py-2">
           <Separator />
