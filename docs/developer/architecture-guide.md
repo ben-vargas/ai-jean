@@ -14,7 +14,11 @@ High-level architectural overview and mental models for the Jean desktop applica
 
 ### GitHub issue and PR context scope
 
-`load_issue_context` and `load_pr_context` attach references to a session through Inject Context or the chat `@` picker. A worktree can also have issue or PR references from its creation. For each type independently, explicit session references replace worktree references in the loaded-context lists and AI prompts. If a session has no references of that type, the worktree references are the fallback. Older sessions can contain copied worktree references; when they also contain a distinct session reference, only the distinct reference is effective. Do not copy worktree references into new sessions or merge the two scopes in a new prompt path. The shared context files remain reference-counted.
+`load_issue_context` and `load_pr_context` attach references to a session through Inject Context or the chat `#` picker. The chat `@` picker adds files, not issues or PRs. A worktree can also have issue or PR references from its creation. For each type independently, explicit session references replace worktree references in the loaded-context lists and AI prompts. If a session has no references of that type, the worktree references are the fallback. Older sessions can contain copied worktree references; when they also contain a distinct session reference, only the distinct reference is effective. Do not copy worktree references into new sessions or merge the two scopes in a new prompt path. The shared context files remain reference-counted.
+
+In the chat `#` picker, the plus action attaches an issue or PR to the active session. The sparkle action attaches it first, then inserts the configured investigation magic prompt for that selected issue or PR into the chat draft. It does not send the draft. On native desktop, Enter selects the row and Shift+Enter inserts the investigation prompt; mobile and Web Access show the tap actions without keyboard hints.
+
+**Investigate in the Current Worktree** creates a new session. Pass the selected issue context to `start_background_investigation`; the backend must save its session reference before it queues the prompt. This keeps the issue available to later commands in that session, including Comment & Close Issue.
 
 ### The "Onion" State Architecture
 

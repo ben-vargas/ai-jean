@@ -1036,8 +1036,7 @@ function ChatWindowContent({
   )
   const currentStreamingContentBlocks = useChatStore(state =>
     activeSessionId
-      ? (state.streamingContentBlocks[activeSessionId] ??
-        EMPTY_CONTENT_BLOCKS)
+      ? (state.streamingContentBlocks[activeSessionId] ?? EMPTY_CONTENT_BLOCKS)
       : EMPTY_CONTENT_BLOCKS
   )
   // Per-session input - check if there's any input for submit button state
@@ -3130,6 +3129,13 @@ function ChatWindowContent({
                                   onCommandExecute={handleCommandExecute}
                                   onHasValueChange={setHasInputValue}
                                   onSteerModifierChange={setSteerModifierActive}
+                                  investigateIssuePrompt={
+                                    preferences?.magic_prompts
+                                      ?.investigate_issue
+                                  }
+                                  investigatePRPrompt={
+                                    preferences?.magic_prompts?.investigate_pr
+                                  }
                                   onRegisterClearHandler={(
                                     handler: (() => void) | null
                                   ) => {

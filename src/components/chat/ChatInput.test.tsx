@@ -49,6 +49,54 @@ vi.mock('./FileMentionPopover', () => ({
   FileMentionPopover: () => null,
 }))
 
+vi.mock('./ContextMentionPopover', () => ({
+  ContextMentionPopover: ({
+    open,
+    onSelectContext,
+  }: {
+    open: boolean
+    onSelectContext: (item: unknown, investigate: boolean) => void
+  }) =>
+    open ? (
+      <>
+        <button
+          type="button"
+          onClick={() =>
+            onSelectContext(
+              {
+                id: 'issue:123',
+                type: 'issue',
+                label: '#123',
+                title: 'Login fails',
+                issue: { number: 123, title: 'Login fails' },
+              },
+              true
+            )
+          }
+        >
+          Investigate selected issue
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onSelectContext(
+              {
+                id: 'pr:45',
+                type: 'pr',
+                label: 'PR #45',
+                title: 'Fix login',
+                pr: { number: 45, title: 'Fix login' },
+              },
+              true
+            )
+          }
+        >
+          Investigate selected PR
+        </button>
+      </>
+    ) : null,
+}))
+
 vi.mock('./SlashPopover', () => ({
   SlashPopover: slashPopoverMock,
 }))
@@ -65,7 +113,11 @@ vi.mock('@/store/chat-store', () => ({
 }))
 
 describe('ChatInput attachments', () => {
-  const renderInput = (activeSessionId = 'session-1') => {
+  const renderInput = (
+    activeSessionId = 'session-1',
+    investigateIssuePrompt?: string,
+    investigatePRPrompt?: string
+  ) => {
     const formRef = createRef<HTMLFormElement>()
     const inputRef = createRef<HTMLTextAreaElement>()
 
@@ -80,6 +132,8 @@ describe('ChatInput attachments', () => {
         onCancel={vi.fn()}
         formRef={formRef}
         inputRef={inputRef}
+        investigateIssuePrompt={investigateIssuePrompt}
+        investigatePRPrompt={investigatePRPrompt}
       />
     )
 
@@ -104,6 +158,59 @@ describe('ChatInput attachments', () => {
     storeState.addPendingTextFile.mockReset()
     storeState.inputDrafts = {}
     slashPopoverMock.mockClear()
+  })
+
+  it('attaches an issue before adding its magic investigation prompt to the draft', async () => {
+    invokeMock.mockResolvedValue(undefined)
+    const textarea = renderInput(
+      'session-1',
+      'Investigate the loaded GitHub {issueWord} ({issueRefs})'
+    )
+
+    fireEvent.change(textarea, { target: { value: '#' } })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Investigate selected issue' })
+    )
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith('load_issue_context', {
+        sessionId: 'session-1',
+        issueNumber: 123,
+        projectPath: '/tmp/worktree',
+      })
+      expect(storeState.setInputDraft).toHaveBeenCalledWith(
+        'session-1',
+        'Investigate the loaded GitHub issue (#123)'
+      )
+    })
+    expect(textarea.value).toBe('Investigate the loaded GitHub issue (#123)')
+  })
+
+  it('attaches a PR before adding its magic investigation prompt to the draft', async () => {
+    invokeMock.mockResolvedValue(undefined)
+    const textarea = renderInput(
+      'session-1',
+      undefined,
+      'Investigate the loaded GitHub {prWord} ({prRefs})'
+    )
+
+    fireEvent.change(textarea, { target: { value: '#' } })
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Investigate selected PR' })
+    )
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith('load_pr_context', {
+        sessionId: 'session-1',
+        prNumber: 45,
+        projectPath: '/tmp/worktree',
+      })
+      expect(storeState.setInputDraft).toHaveBeenCalledWith(
+        'session-1',
+        'Investigate the loaded GitHub PR (#45)'
+      )
+    })
+    expect(textarea.value).toBe('Investigate the loaded GitHub PR (#45)')
   })
 
   it('opens the skill picker when typing $ for a Codex session', () => {

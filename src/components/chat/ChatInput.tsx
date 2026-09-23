@@ -57,6 +57,10 @@ import {
 import { isModKeyEvent } from '@/types/keybindings'
 import { isSteerCapableBackend } from '@/lib/backend-auto-steer'
 import { isNativeApp } from '@/lib/environment'
+import {
+  DEFAULT_INVESTIGATE_ISSUE_PROMPT,
+  DEFAULT_INVESTIGATE_PR_PROMPT,
+} from '@/types/preferences'
 
 /** Threshold for saving pasted text as file (2000 chars) */
 const TEXT_PASTE_THRESHOLD = 2000
@@ -81,6 +85,8 @@ interface ChatInputProps {
   installedBackends?: CliBackend[]
   selectedBackend?: CliBackend
   onSteerModifierChange?: (active: boolean) => void
+  investigateIssuePrompt?: string | null
+  investigatePRPrompt?: string | null
 }
 
 export const ChatInput = memo(function ChatInput({
@@ -103,6 +109,8 @@ export const ChatInput = memo(function ChatInput({
   installedBackends,
   selectedBackend,
   onSteerModifierChange,
+  investigateIssuePrompt,
+  investigatePRPrompt,
 }: ChatInputProps) {
   const isMobile = useIsMobile()
   const zenMode = useUIStore(state => state.zenMode)
@@ -569,7 +577,9 @@ export const ChatInput = memo(function ChatInput({
           case 'Enter':
           case 'Tab':
             e.preventDefault()
-            contextMentionHandleRef.current?.selectCurrent()
+            contextMentionHandleRef.current?.selectCurrent(
+              e.key === 'Enter' && e.shiftKey
+            )
             return
           case 'Escape':
             e.preventDefault()
@@ -1068,7 +1078,7 @@ export const ChatInput = memo(function ChatInput({
   }, [])
 
   const handleContextSelect = useCallback(
-    async (item: ContextMentionItem) => {
+    async (item: ContextMentionItem, investigate = false) => {
       if (!activeSessionId) return
 
       const toastId = toast.loading(`Loading ${item.label} context...`)
@@ -1133,15 +1143,30 @@ export const ChatInput = memo(function ChatInput({
           const beforeHash = currentValue.slice(0, triggerIndex)
           const afterQuery = currentValue.slice(cursorPos)
           const token = contextMentionToken(item)
-          const newValue = `${beforeHash}${token} ${afterQuery}`
+          let insertion = `${token} `
+          if (investigate && item.type === 'issue') {
+            insertion = (
+              investigateIssuePrompt?.trim() || DEFAULT_INVESTIGATE_ISSUE_PROMPT
+            )
+              .replace(/\{issueWord\}/g, 'issue')
+              .replace(/\{issueRefs\}/g, token)
+          } else if (investigate && item.type === 'pr') {
+            insertion = (
+              investigatePRPrompt?.trim() || DEFAULT_INVESTIGATE_PR_PROMPT
+            )
+              .replace(/\{prWord\}/g, 'PR')
+              .replace(/\{prRefs\}/g, `#${item.pr?.number}`)
+          }
+          const newValue = `${beforeHash}${insertion}${afterQuery}`
 
           inputRef.current.value = newValue
           valueRef.current = newValue
           useChatStore.getState().setInputDraft(activeSessionId, newValue)
           resizeTextarea()
+          onHasValueChangeRef.current?.(Boolean(newValue.trim()))
 
           requestAnimationFrame(() => {
-            const newCursorPos = triggerIndex + token.length + 1
+            const newCursorPos = triggerIndex + insertion.length
             inputRef.current?.setSelectionRange(newCursorPos, newCursorPos)
           })
         }
@@ -1163,6 +1188,8 @@ export const ChatInput = memo(function ChatInput({
       contextMentionToken,
       hashTriggerIndex,
       inputRef,
+      investigateIssuePrompt,
+      investigatePRPrompt,
       resizeTextarea,
     ]
   )

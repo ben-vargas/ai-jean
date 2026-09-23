@@ -6,11 +6,15 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Loader2 } from '@/components/icons/reicon'
+import { Loader2, Plus, Sparkles } from '@/components/icons/reicon'
+import { Kbd } from '@/components/ui/kbd'
+import { useIsMobile } from '@/hooks/use-mobile'
+import { isNativeApp } from '@/lib/environment'
 import {
   Command,
   CommandEmpty,
   CommandGroup,
+  CommandInput,
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
@@ -24,7 +28,7 @@ import {
 export interface ContextMentionPopoverHandle {
   moveUp: () => void
   moveDown: () => void
-  selectCurrent: () => void
+  selectCurrent: (investigate?: boolean) => void
 }
 
 interface ContextMentionPopoverProps {
@@ -32,7 +36,7 @@ interface ContextMentionPopoverProps {
   projectId: string | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSelectContext: (item: ContextMentionItem) => void
+  onSelectContext: (item: ContextMentionItem, investigate?: boolean) => void
   searchQuery: string
   anchorPosition: { top: number; left: number } | null
   containerWidth?: number
@@ -50,12 +54,15 @@ export function ContextMentionPopover({
   containerWidth,
   handleRef,
 }: ContextMentionPopoverProps) {
+  const isMobile = useIsMobile()
+  const showKeyboardHints = isNativeApp() && !isMobile
   const [includeClosed, setIncludeClosed] = useState(false)
+  const [menuSearch, setMenuSearch] = useState('')
   const { groups, isFetching } = useContextMentionData({
     open,
     projectPath,
     projectId,
-    query: searchQuery,
+    query: menuSearch || searchQuery,
     includeClosed,
   })
   const listRef = useRef<HTMLDivElement>(null)
@@ -72,8 +79,8 @@ export function ContextMentionPopover({
   )
 
   const handleSelect = useCallback(
-    (item: ContextMentionItem) => {
-      onSelectContext(item)
+    (item: ContextMentionItem, investigate = false) => {
+      onSelectContext(item, investigate)
       onOpenChange(false)
     },
     [onOpenChange, onSelectContext]
@@ -81,7 +88,11 @@ export function ContextMentionPopover({
 
   useEffect(() => {
     if (open) setSelectedIndex(0)
-  }, [open, searchQuery])
+  }, [open, searchQuery, menuSearch])
+
+  useEffect(() => {
+    if (open) setMenuSearch('')
+  }, [open])
 
   useImperativeHandle(
     handleRef,
@@ -91,9 +102,9 @@ export function ContextMentionPopover({
         setSelectedIndex(i =>
           Math.min(i + 1, Math.max(0, flatItems.length - 1))
         ),
-      selectCurrent: () => {
+      selectCurrent: (investigate = false) => {
         const item = flatItems[clampedSelectedIndex]
-        if (item) handleSelect(item)
+        if (item) handleSelect(item, investigate)
       },
     }),
     [clampedSelectedIndex, flatItems, handleSelect]
@@ -150,7 +161,37 @@ export function ContextMentionPopover({
             {includeClosed ? 'Showing closed/merged' : 'Include closed/merged'}
           </button>
         </div>
-        <Command shouldFilter={false}>
+        <Command label="Search issues and context links" shouldFilter={false}>
+          <CommandInput
+            placeholder="Search issue title or description..."
+            value={menuSearch}
+            onValueChange={setMenuSearch}
+            onKeyDown={event => {
+              event.stopPropagation()
+              switch (event.key) {
+                case 'ArrowDown':
+                  event.preventDefault()
+                  setSelectedIndex(index =>
+                    Math.min(index + 1, Math.max(0, flatItems.length - 1))
+                  )
+                  break
+                case 'ArrowUp':
+                  event.preventDefault()
+                  setSelectedIndex(index => Math.max(index - 1, 0))
+                  break
+                case 'Enter': {
+                  event.preventDefault()
+                  const item = flatItems[clampedSelectedIndex]
+                  if (item) handleSelect(item, event.shiftKey)
+                  break
+                }
+                case 'Escape':
+                  event.preventDefault()
+                  onOpenChange(false)
+                  break
+              }
+            }}
+          />
           <CommandList
             ref={listRef}
             className="min-h-[280px] max-h-[min(420px,60vh)]"
@@ -205,6 +246,40 @@ export function ContextMentionPopover({
                         {item.badge && (
                           <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
                             {item.badge}
+                          </span>
+                        )}
+                        {(item.type === 'issue' || item.type === 'pr') && (
+                          <span className="flex shrink-0 items-center gap-1">
+                            <button
+                              type="button"
+                              aria-label={`Add ${item.label} to session context`}
+                              title={`Add ${item.label} to session context`}
+                              className="flex min-h-8 items-center gap-1 rounded px-1.5 hover:bg-muted"
+                              onClick={event => {
+                                event.stopPropagation()
+                                handleSelect(item)
+                              }}
+                            >
+                              <Plus className="size-3.5" />
+                              {showKeyboardHints && isSelected && (
+                                <Kbd>Enter</Kbd>
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Add ${item.label} and insert investigation prompt`}
+                              title={`Add ${item.label} and insert investigation prompt`}
+                              className="flex min-h-8 items-center gap-1 rounded px-1.5 hover:bg-muted"
+                              onClick={event => {
+                                event.stopPropagation()
+                                handleSelect(item, true)
+                              }}
+                            >
+                              <Sparkles className="size-3.5" />
+                              {showKeyboardHints && isSelected && (
+                                <Kbd>Shift+Enter</Kbd>
+                              )}
+                            </button>
                           </span>
                         )}
                       </CommandItem>

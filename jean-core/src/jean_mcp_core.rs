@@ -13,6 +13,7 @@ use tauri::AppHandle;
 use crate::chat::types::LabelData;
 use crate::http_server::dispatch::dispatch_command;
 use crate::http_server::EmitExt;
+use crate::projects::github_issues::{attach_issue_context_for_session, IssueContext};
 
 pub const MCP_PROTOCOL_VERSION: &str = "2024-11-05";
 pub const JEAN_MCP_STDIO_ARG: &str = "--jean-mcp-stdio";
@@ -2211,6 +2212,7 @@ async fn start_autoinvestigating(
         parallel_execution_prompt,
         Some(selection.execution_mode.clone()),
         Some(source.to_string()),
+        None,
         false,
     )
     .await
@@ -2405,6 +2407,7 @@ pub async fn start_background_investigation_impl(
     parallel_execution_prompt: Option<String>,
     execution_mode: Option<String>,
     source: Option<String>,
+    issue_context: Option<IssueContext>,
     force_new_session: bool,
 ) -> Result<BackgroundInvestigationResult, String> {
     let sessions = crate::chat::get_sessions(
@@ -2441,6 +2444,10 @@ pub async fn start_background_investigation_impl(
             created.id
         }
     };
+
+    if let Some(issue_context) = issue_context {
+        attach_issue_context_for_session(app, &session_id, &worktree_path, &issue_context)?;
+    }
 
     crate::chat::set_session_model(
         app.clone(),
@@ -2541,6 +2548,7 @@ pub async fn start_background_investigation(
     ai_language: Option<String>,
     parallel_execution_prompt: Option<String>,
     execution_mode: Option<String>,
+    issue_context: Option<IssueContext>,
     force_new_session: Option<bool>,
 ) -> Result<BackgroundInvestigationResult, String> {
     start_background_investigation_impl(
@@ -2558,6 +2566,7 @@ pub async fn start_background_investigation(
         parallel_execution_prompt,
         execution_mode,
         Some("ui".to_string()),
+        issue_context,
         force_new_session.unwrap_or(false),
     )
     .await

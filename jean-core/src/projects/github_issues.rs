@@ -1254,45 +1254,54 @@ pub async fn load_issue_context(
 ) -> Result<LoadedIssueContext, String> {
     log::trace!("Loading issue #{issue_number} context for session {session_id}");
 
-    // Get repo identifier for shared storage
-    let repo_id = get_repo_identifier(&project_path)?;
-    let repo_key = repo_id.to_key();
-
     // Fetch issue data from GitHub
-    let issue = get_github_issue(app.clone(), project_path, issue_number).await?;
+    let issue = get_github_issue(app.clone(), project_path.clone(), issue_number).await?;
 
     // Create issue context
     let ctx = IssueContext {
         number: issue.number,
-        title: issue.title.clone(),
+        title: issue.title,
         body: issue.body,
         comments: issue.comments,
     };
 
+    attach_issue_context_for_session(&app, &session_id, &project_path, &ctx)
+}
+
+/// Save an already-fetched issue on a session before its investigation is queued.
+pub fn attach_issue_context_for_session(
+    app: &tauri::AppHandle,
+    session_id: &str,
+    project_path: &str,
+    ctx: &IssueContext,
+) -> Result<LoadedIssueContext, String> {
+    let repo_id = get_repo_identifier(project_path)?;
+    let repo_key = repo_id.to_key();
+
     // Write to shared git-context directory
-    let contexts_dir = get_github_contexts_dir(&app)?;
+    let contexts_dir = get_github_contexts_dir(app)?;
     std::fs::create_dir_all(&contexts_dir)
         .map_err(|e| format!("Failed to create git-context directory: {e}"))?;
 
     // File format: {repo_key}-issue-{number}.md
-    let context_file = contexts_dir.join(format!("{repo_key}-issue-{issue_number}.md"));
-    let context_content = format_issue_context_markdown(&ctx);
+    let context_file = contexts_dir.join(format!("{repo_key}-issue-{}.md", ctx.number));
+    let context_content = format_issue_context_markdown(ctx);
 
     std::fs::write(&context_file, context_content)
         .map_err(|e| format!("Failed to write issue context file: {e}"))?;
 
     // Add reference tracking
-    add_issue_reference(&app, &repo_key, issue_number, &session_id)?;
+    add_issue_reference(app, &repo_key, ctx.number, session_id)?;
 
     log::trace!(
         "Issue context loaded successfully for issue #{} ({} comments)",
-        issue_number,
+        ctx.number,
         ctx.comments.len()
     );
 
     Ok(LoadedIssueContext {
-        number: issue.number,
-        title: issue.title,
+        number: ctx.number,
+        title: ctx.title.clone(),
         comment_count: ctx.comments.len(),
         repo_owner: repo_id.owner,
         repo_name: repo_id.repo,

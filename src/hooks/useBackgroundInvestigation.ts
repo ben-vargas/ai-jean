@@ -628,6 +628,7 @@ async function processBackgroundInvestigation(
     aiLanguage: preferences?.ai_language,
     executionMode,
     forceNewSession: override?.forceNewSession,
+    issueContext: override?.issueContext,
   })
 
   const sessionId = result.sessionId
