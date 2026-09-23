@@ -70,6 +70,23 @@ vi.mock('./ContextMentionPopover', () => ({
                 title: 'Login fails',
                 issue: { number: 123, title: 'Login fails' },
               },
+              false
+            )
+          }
+        >
+          Add selected issue
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onSelectContext(
+              {
+                id: 'issue:123',
+                type: 'issue',
+                label: '#123',
+                title: 'Login fails',
+                issue: { number: 123, title: 'Login fails' },
+              },
               true
             )
           }
@@ -92,6 +109,23 @@ vi.mock('./ContextMentionPopover', () => ({
           }
         >
           Investigate selected PR
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            onSelectContext(
+              {
+                id: 'pr:45',
+                type: 'pr',
+                label: 'PR #45',
+                title: 'Fix login',
+                pr: { number: 45, title: 'Fix login' },
+              },
+              false
+            )
+          }
+        >
+          Add selected PR
         </button>
       </>
     ) : null,
@@ -167,7 +201,7 @@ describe('ChatInput attachments', () => {
       'Investigate the loaded GitHub {issueWord} ({issueRefs})'
     )
 
-    fireEvent.change(textarea, { target: { value: '#' } })
+    fireEvent.change(textarea, { target: { value: '#42' } })
     fireEvent.click(
       screen.getByRole('button', { name: 'Investigate selected issue' })
     )
@@ -184,6 +218,40 @@ describe('ChatInput attachments', () => {
       )
     })
     expect(textarea.value).toBe('Investigate the loaded GitHub issue (#123)')
+  })
+
+  it('removes the typed hash and number after attaching an issue', async () => {
+    invokeMock.mockResolvedValue(undefined)
+    const textarea = renderInput()
+
+    fireEvent.change(textarea, { target: { value: '#42' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add selected issue' }))
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith('load_issue_context', {
+        sessionId: 'session-1',
+        issueNumber: 123,
+        projectPath: '/tmp/worktree',
+      })
+      expect(storeState.setInputDraft).toHaveBeenCalledWith('session-1', '')
+    })
+    expect(textarea.value).toBe('')
+  })
+
+  it('removes only the typed hash query when other draft text exists', async () => {
+    invokeMock.mockResolvedValue(undefined)
+    const textarea = renderInput()
+
+    fireEvent.change(textarea, { target: { value: 'Check this #42' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add selected issue' }))
+
+    await waitFor(() => {
+      expect(storeState.setInputDraft).toHaveBeenCalledWith(
+        'session-1',
+        'Check this '
+      )
+    })
+    expect(textarea.value).toBe('Check this ')
   })
 
   it('attaches a PR before adding its magic investigation prompt to the draft', async () => {
@@ -211,6 +279,24 @@ describe('ChatInput attachments', () => {
       )
     })
     expect(textarea.value).toBe('Investigate the loaded GitHub PR (#45)')
+  })
+
+  it('removes the typed hash and number after attaching a PR', async () => {
+    invokeMock.mockResolvedValue(undefined)
+    const textarea = renderInput()
+
+    fireEvent.change(textarea, { target: { value: '#42' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add selected PR' }))
+
+    await waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith('load_pr_context', {
+        sessionId: 'session-1',
+        prNumber: 45,
+        projectPath: '/tmp/worktree',
+      })
+      expect(storeState.setInputDraft).toHaveBeenCalledWith('session-1', '')
+    })
+    expect(textarea.value).toBe('')
   })
 
   it('opens the skill picker when typing $ for a Codex session', () => {

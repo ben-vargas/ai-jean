@@ -6,7 +6,9 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Loader2, Plus, Sparkles } from '@/components/icons/reicon'
+import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { Loader2, Plus, RefreshCw, Sparkles } from '@/components/icons/reicon'
 import { Kbd } from '@/components/ui/kbd'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { isNativeApp } from '@/lib/environment'
@@ -24,6 +26,24 @@ import {
   type ContextMentionItem,
   useContextMentionData,
 } from './hooks/useContextMentionData'
+
+const githubContextQueries = new Set([
+  'issues',
+  'prs',
+  'issue-search',
+  'pr-search',
+  'issue-by-number',
+  'pr-by-number',
+  'security-alerts',
+  'security-alert',
+  'advisories',
+  'advisory',
+])
+const linearContextQueries = new Set([
+  'issues',
+  'issue-search',
+  'issue-by-number',
+])
 
 export interface ContextMentionPopoverHandle {
   moveUp: () => void
@@ -54,16 +74,22 @@ export function ContextMentionPopover({
   containerWidth,
   handleRef,
 }: ContextMentionPopoverProps) {
+  const queryClient = useQueryClient()
   const isMobile = useIsMobile()
   const showKeyboardHints = isNativeApp() && !isMobile
   const [includeClosed, setIncludeClosed] = useState(false)
   const [menuSearch, setMenuSearch] = useState('')
+  const [issueLimit, setIssueLimit] = useState(8)
+  const [prLimit, setPrLimit] = useState(8)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const { groups, isFetching } = useContextMentionData({
     open,
     projectPath,
     projectId,
     query: menuSearch || searchQuery,
     includeClosed,
+    issueLimit,
+    prLimit,
   })
   const listRef = useRef<HTMLDivElement>(null)
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -86,9 +112,37 @@ export function ContextMentionPopover({
     [onOpenChange, onSelectContext]
   )
 
+  const handleRefresh = useCallback(async () => {
+    if (!projectPath && !projectId) return
+    setIsRefreshing(true)
+    try {
+      await queryClient.invalidateQueries(
+        {
+          predicate: ({ queryKey }) =>
+            (Boolean(projectPath) &&
+              queryKey[0] === 'github' &&
+              queryKey[2] === projectPath &&
+              githubContextQueries.has(String(queryKey[1]))) ||
+            (Boolean(projectId) &&
+              queryKey[0] === 'linear' &&
+              queryKey[2] === projectId &&
+              linearContextQueries.has(String(queryKey[1]))),
+        },
+        { throwOnError: true }
+      )
+    } catch (error) {
+      toast.error(`Failed to refresh context links: ${error}`)
+    } finally {
+      setIsRefreshing(false)
+    }
+  }, [projectId, projectPath, queryClient])
+
   useEffect(() => {
-    if (open) setSelectedIndex(0)
-  }, [open, searchQuery, menuSearch])
+    if (!open) return
+    setSelectedIndex(0)
+    setIssueLimit(8)
+    setPrLimit(8)
+  }, [open, searchQuery, menuSearch, includeClosed, projectPath])
 
   useEffect(() => {
     if (open) setMenuSearch('')
@@ -148,18 +202,34 @@ export function ContextMentionPopover({
           <span className="text-xs font-medium text-muted-foreground">
             Context links
           </span>
-          <button
-            type="button"
-            onClick={() => setIncludeClosed(value => !value)}
-            className={cn(
-              'rounded px-2 py-1 text-xs transition-colors',
-              includeClosed
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-            )}
-          >
-            {includeClosed ? 'Showing closed/merged' : 'Include closed/merged'}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              aria-label="Refresh context links"
+              title="Refresh context links"
+              disabled={isRefreshing || (!projectPath && !projectId)}
+              onClick={() => void handleRefresh()}
+              className="flex size-8 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
+            >
+              <RefreshCw
+                className={cn('size-4', isRefreshing && 'animate-spin')}
+              />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIncludeClosed(value => !value)}
+              className={cn(
+                'rounded px-2 py-1 text-xs transition-colors',
+                includeClosed
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              )}
+            >
+              {includeClosed
+                ? 'Showing closed/merged'
+                : 'Include closed/merged'}
+            </button>
+          </div>
         </div>
         <Command label="Search issues and context links" shouldFilter={false}>
           <CommandInput
@@ -285,6 +355,21 @@ export function ContextMentionPopover({
                       </CommandItem>
                     )
                   })}
+                  {group.hasMore &&
+                    (group.id === 'issue' || group.id === 'pr') && (
+                      <button
+                        type="button"
+                        className="w-full rounded px-3 py-2 text-left text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                        onClick={() => {
+                          if (group.id === 'issue')
+                            setIssueLimit(limit => limit + 8)
+                          else setPrLimit(limit => limit + 8)
+                        }}
+                      >
+                        Load more{' '}
+                        {group.id === 'issue' ? 'issues' : 'pull requests'}
+                      </button>
+                    )}
                 </CommandGroup>
               ))
             )}

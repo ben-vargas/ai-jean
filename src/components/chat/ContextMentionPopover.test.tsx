@@ -1,5 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen } from '@/test/test-utils'
+import { act, fireEvent, render, screen, waitFor } from '@/test/test-utils'
+import { render as renderWithoutProviders } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Bug, GitPullRequest } from '@/components/icons/reicon'
 import { ContextMentionPopover } from './ContextMentionPopover'
 import type { ContextMentionItem } from './hooks/useContextMentionData'
@@ -85,6 +87,12 @@ describe('ContextMentionPopover', () => {
     expect(screen.getByText('#123')).toBeInTheDocument()
     expect(screen.getByText('Fix login bug')).toBeInTheDocument()
     expect(screen.getByText('PR #45')).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Refresh context links' })
+        .parentElement
+    ).toContainElement(
+      screen.getByRole('button', { name: 'Include closed/merged' })
+    )
   })
 
   it('searches from the menu without changing the chat query', () => {
@@ -216,10 +224,178 @@ describe('ContextMentionPopover', () => {
     }
     const { rerender } = render(<ContextMentionPopover {...props} />)
     expect(screen.queryByText('Shift+Enter')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Refresh context links' })
+    ).toBeInTheDocument()
 
     platform.native = false
     platform.mobile = false
     rerender(<ContextMentionPopover {...props} />)
     expect(screen.queryByText('Shift+Enter')).not.toBeInTheDocument()
+  })
+
+  it('loads more issues and PRs independently, then resets for a new search', () => {
+    const issues = Array.from(
+      { length: 10 },
+      (_, index): ContextMentionItem => ({
+        ...items[0],
+        type: 'issue',
+        icon: Bug,
+        id: `issue:${index + 1}`,
+        label: `#${index + 1}`,
+        title: `Issue ${index + 1}`,
+      })
+    )
+    const prs = Array.from(
+      { length: 10 },
+      (_, index): ContextMentionItem => ({
+        ...items[1],
+        type: 'pr',
+        icon: GitPullRequest,
+        id: `pr:${index + 1}`,
+        label: `PR #${index + 1}`,
+        title: `Pull request ${index + 1}`,
+      })
+    )
+    useContextMentionDataMock.mockImplementation(
+      ({ issueLimit, prLimit }: { issueLimit: number; prLimit: number }) => ({
+        groups: [
+          {
+            id: 'issue',
+            heading: 'GitHub Issues',
+            items: issues.slice(0, issueLimit),
+            hasMore: issues.length > issueLimit,
+          },
+          {
+            id: 'pr',
+            heading: 'GitHub Pull Requests',
+            items: prs.slice(0, prLimit),
+            hasMore: prs.length > prLimit,
+          },
+        ],
+        isFetching: false,
+      })
+    )
+
+    const onSelectContext = vi.fn()
+    render(
+      <ContextMentionPopover
+        projectPath="/tmp/repo"
+        projectId="project-1"
+        open
+        onOpenChange={vi.fn()}
+        onSelectContext={onSelectContext}
+        searchQuery=""
+        anchorPosition={{ top: 0, left: 0 }}
+      />
+    )
+
+    expect(screen.queryByText('Issue 9')).not.toBeInTheDocument()
+    expect(screen.queryByText('Pull request 9')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Load more issues' }))
+    expect(screen.getByText('Issue 9')).toBeInTheDocument()
+    expect(screen.queryByText('Pull request 9')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Load more issues' })
+    ).toBeNull()
+
+    const search = screen.getByRole('combobox')
+    for (let index = 0; index < 8; index++) {
+      fireEvent.keyDown(search, { key: 'ArrowDown' })
+    }
+    fireEvent.keyDown(search, { key: 'Enter' })
+    expect(onSelectContext).toHaveBeenCalledWith(issues[8], false)
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Load more pull requests' })
+    )
+    expect(screen.getByText('Pull request 9')).toBeInTheDocument()
+    fireEvent.change(search, { target: { value: 'new search' } })
+    expect(screen.queryByText('Issue 9')).not.toBeInTheDocument()
+    expect(screen.queryByText('Pull request 9')).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Load more issues' })
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'Load more pull requests' })
+    ).toBeInTheDocument()
+  })
+
+  it('refreshes only context queries for the current project', async () => {
+    const client = new QueryClient()
+    const refreshedKeys = [
+      ['github', 'issues', '/tmp/repo', 'open', 'project-1'],
+      ['github', 'prs', '/tmp/repo', 'open', 'project-1'],
+      ['github', 'issue-search', '/tmp/repo', 'login'],
+      ['github', 'security-alerts', '/tmp/repo', 'open'],
+      ['linear', 'issues', 'project-1'],
+    ]
+    const untouchedKeys = [
+      ['github', 'issues', '/tmp/other', 'open', 'project-2'],
+      ['github', 'labels', '/tmp/repo'],
+      ['linear', 'issues', 'project-2'],
+    ]
+    for (const key of [...refreshedKeys, ...untouchedKeys]) {
+      client.setQueryData(key, [])
+    }
+
+    renderWithoutProviders(
+      <QueryClientProvider client={client}>
+        <ContextMentionPopover
+          projectPath="/tmp/repo"
+          projectId="project-1"
+          open
+          onOpenChange={vi.fn()}
+          onSelectContext={vi.fn()}
+          searchQuery=""
+          anchorPosition={{ top: 0, left: 0 }}
+        />
+      </QueryClientProvider>
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Refresh context links' })
+    )
+    await waitFor(() => {
+      for (const key of refreshedKeys) {
+        expect(client.getQueryState(key)?.isInvalidated).toBe(true)
+      }
+    })
+    for (const key of untouchedKeys) {
+      expect(client.getQueryState(key)?.isInvalidated).toBe(false)
+    }
+  })
+
+  it('blocks a second refresh while the first refresh runs', async () => {
+    const client = new QueryClient()
+    let finishRefresh: (() => void) | undefined
+    vi.spyOn(client, 'invalidateQueries').mockImplementation(
+      () =>
+        new Promise<void>(resolve => {
+          finishRefresh = resolve
+        })
+    )
+
+    renderWithoutProviders(
+      <QueryClientProvider client={client}>
+        <ContextMentionPopover
+          projectPath="/tmp/repo"
+          projectId="project-1"
+          open
+          onOpenChange={vi.fn()}
+          onSelectContext={vi.fn()}
+          searchQuery=""
+          anchorPosition={{ top: 0, left: 0 }}
+        />
+      </QueryClientProvider>
+    )
+
+    const refresh = screen.getByRole('button', {
+      name: 'Refresh context links',
+    })
+    fireEvent.click(refresh)
+    expect(refresh).toBeDisabled()
+    await act(async () => finishRefresh?.())
+    expect(refresh).not.toBeDisabled()
   })
 })

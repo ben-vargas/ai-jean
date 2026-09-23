@@ -1138,37 +1138,42 @@ export const ChatInput = memo(function ChatInput({
         const triggerIndex = hashTriggerIndex
         if (triggerIndex !== null && inputRef.current) {
           const currentValue = valueRef.current
-          const cursorPos =
-            inputRef.current.selectionStart ?? currentValue.length
-          const beforeHash = currentValue.slice(0, triggerIndex)
-          const afterQuery = currentValue.slice(cursorPos)
-          const token = contextMentionToken(item)
-          let insertion = `${token} `
-          if (investigate && item.type === 'issue') {
-            insertion = (
-              investigateIssuePrompt?.trim() || DEFAULT_INVESTIGATE_ISSUE_PROMPT
-            )
-              .replace(/\{issueWord\}/g, 'issue')
-              .replace(/\{issueRefs\}/g, token)
-          } else if (investigate && item.type === 'pr') {
-            insertion = (
-              investigatePRPrompt?.trim() || DEFAULT_INVESTIGATE_PR_PROMPT
-            )
-              .replace(/\{prWord\}/g, 'PR')
-              .replace(/\{prRefs\}/g, `#${item.pr?.number}`)
+          const mention = /^#[^\s]*/.exec(currentValue.slice(triggerIndex))
+          if (mention) {
+            const token = contextMentionToken(item)
+            let insertion = ''
+            if (investigate && item.type === 'issue') {
+              insertion = (
+                investigateIssuePrompt?.trim() ||
+                DEFAULT_INVESTIGATE_ISSUE_PROMPT
+              )
+                .replace(/\{issueWord\}/g, 'issue')
+                .replace(/\{issueRefs\}/g, token)
+            } else if (investigate && item.type === 'pr') {
+              insertion = (
+                investigatePRPrompt?.trim() || DEFAULT_INVESTIGATE_PR_PROMPT
+              )
+                .replace(/\{prWord\}/g, 'PR')
+                .replace(/\{prRefs\}/g, `#${item.pr?.number}`)
+            }
+            const newValue =
+              currentValue.slice(0, triggerIndex) +
+              insertion +
+              currentValue.slice(triggerIndex + mention[0].length)
+
+            inputRef.current.value = newValue
+            valueRef.current = newValue
+            useChatStore.getState().setInputDraft(activeSessionId, newValue)
+            resizeTextarea()
+            const isEmpty = !newValue.trim()
+            setShowHint(isEmpty)
+            onHasValueChangeRef.current?.(!isEmpty)
+
+            requestAnimationFrame(() => {
+              const newCursorPos = triggerIndex + insertion.length
+              inputRef.current?.setSelectionRange(newCursorPos, newCursorPos)
+            })
           }
-          const newValue = `${beforeHash}${insertion}${afterQuery}`
-
-          inputRef.current.value = newValue
-          valueRef.current = newValue
-          useChatStore.getState().setInputDraft(activeSessionId, newValue)
-          resizeTextarea()
-          onHasValueChangeRef.current?.(Boolean(newValue.trim()))
-
-          requestAnimationFrame(() => {
-            const newCursorPos = triggerIndex + insertion.length
-            inputRef.current?.setSelectionRange(newCursorPos, newCursorPos)
-          })
         }
 
         toast.success(`Loaded ${item.label} context`, { id: toastId })
