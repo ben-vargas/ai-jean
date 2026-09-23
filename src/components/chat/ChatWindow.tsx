@@ -168,6 +168,7 @@ import {
 import { useUIStore } from '@/store/ui-store'
 import { buildMcpConfigJson } from '@/services/mcp'
 import { CHECK_GITHUB_ISSUES_PROMPT } from '@/lib/github-discovery-prompt'
+import { buildCommentAndCloseIssuePrompt } from '@/lib/github-issue-close-prompt'
 import type { McpServerInfo } from '@/types/chat'
 import { useGitStatus } from '@/services/git-status'
 import { useRemotePicker } from '@/hooks/useRemotePicker'
@@ -1635,10 +1636,13 @@ function ChatWindowContent({
   }, [getMcpConfig, sendMessageNow])
 
   const handleCommentAndCloseIssue = useCallback(() => {
+    if (!loadedIssueContexts?.length) {
+      toast.error('No GitHub issue attached to this session or worktree')
+      return
+    }
     sendMessageNow({
       id: generateId(),
-      message:
-        'Find the full SHA of the latest commit on this worktree. For each GitHub issue loaded in this session context, add a comment containing exactly "Fixed in <commit SHA>" with that SHA in place of <commit SHA>. Add no other text to the comment. Then close the issue. Do not change any other issue.',
+      message: buildCommentAndCloseIssuePrompt(loadedIssueContexts),
       pendingImages: [],
       pendingFiles: [],
       pendingSkills: [],
@@ -1654,7 +1658,7 @@ function ChatWindowContent({
       backend: selectedBackendRef.current,
       queuedAt: Date.now(),
     })
-  }, [getMcpConfig, sendMessageNow])
+  }, [getMcpConfig, loadedIssueContexts, sendMessageNow])
 
   // Note: Queue processing moved to useQueueProcessor hook in App.tsx
   // This ensures queued messages execute even when the worktree is unfocused

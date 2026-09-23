@@ -12,6 +12,10 @@ High-level architectural overview and mental models for the Jean desktop applica
 
 ## Mental Models
 
+### GitHub issue and PR context scope
+
+`load_issue_context` and `load_pr_context` attach references to a session through Inject Context or the chat `@` picker. A worktree can also have issue or PR references from its creation. For each type independently, explicit session references replace worktree references in the loaded-context lists and AI prompts. If a session has no references of that type, the worktree references are the fallback. Older sessions can contain copied worktree references; when they also contain a distinct session reference, only the distinct reference is effective. Do not copy worktree references into new sessions or merge the two scopes in a new prompt path. The shared context files remain reference-counted.
+
 ### The "Onion" State Architecture
 
 State management follows a clear three-layer hierarchy:

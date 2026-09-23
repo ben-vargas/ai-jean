@@ -27,9 +27,7 @@ use super::types::{
 };
 use crate::claude_cli::resolve_cli_binary;
 use crate::http_server::EmitExt;
-use crate::projects::github_issues::{
-    add_issue_reference, add_pr_reference, get_session_issue_refs, get_session_pr_refs,
-};
+use crate::projects::github_issues::{get_preferred_issue_refs, get_preferred_pr_refs};
 use crate::projects::storage::load_projects_data;
 use crate::projects::types::{SessionType, Worktree};
 
@@ -613,39 +611,6 @@ pub async fn get_sessions(
         }
     }
 
-    // Propagate issue/PR references from worktree_id to session IDs
-    // (create_worktree stores refs under worktree_id, but toolbar queries by session_id)
-    let worktree_issue_keys = get_session_issue_refs(&app, &worktree_id).unwrap_or_default();
-    let worktree_pr_keys = get_session_pr_refs(&app, &worktree_id).unwrap_or_default();
-
-    if !worktree_issue_keys.is_empty() || !worktree_pr_keys.is_empty() {
-        for session in &sessions.sessions {
-            let session_issues = get_session_issue_refs(&app, &session.id).unwrap_or_default();
-            let session_prs = get_session_pr_refs(&app, &session.id).unwrap_or_default();
-
-            if session_issues.is_empty() && !worktree_issue_keys.is_empty() {
-                for key in &worktree_issue_keys {
-                    if let Some(number_str) = key.rsplit('-').next() {
-                        if let Ok(number) = number_str.parse::<u32>() {
-                            let repo_key = &key[..key.len() - number_str.len() - 1];
-                            let _ = add_issue_reference(&app, repo_key, number, &session.id);
-                        }
-                    }
-                }
-            }
-            if session_prs.is_empty() && !worktree_pr_keys.is_empty() {
-                for key in &worktree_pr_keys {
-                    if let Some(number_str) = key.rsplit('-').next() {
-                        if let Ok(number) = number_str.parse::<u32>() {
-                            let repo_key = &key[..key.len() - number_str.len() - 1];
-                            let _ = add_pr_reference(&app, repo_key, number, &session.id);
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     Ok(sessions)
 }
 
@@ -1064,29 +1029,6 @@ pub async fn create_session(
         log::trace!("Created session: {}", session.id);
         Ok(session)
     })?;
-
-    // Copy issue/PR context references from worktree_id to new session_id
-    // (worktree creation stores refs under worktree_id, but toolbar queries by session_id)
-    if let Ok(issue_keys) = get_session_issue_refs(&app, &worktree_id) {
-        for key in &issue_keys {
-            if let Some(number_str) = key.rsplit('-').next() {
-                if let Ok(number) = number_str.parse::<u32>() {
-                    let repo_key = &key[..key.len() - number_str.len() - 1];
-                    let _ = add_issue_reference(&app, repo_key, number, &session.id);
-                }
-            }
-        }
-    }
-    if let Ok(pr_keys) = get_session_pr_refs(&app, &worktree_id) {
-        for key in &pr_keys {
-            if let Some(number_str) = key.rsplit('-').next() {
-                if let Ok(number) = number_str.parse::<u32>() {
-                    let repo_key = &key[..key.len() - number_str.len() - 1];
-                    let _ = add_pr_reference(&app, repo_key, number, &session.id);
-                }
-            }
-        }
-    }
 
     emit_sessions_cache_invalidation(&app);
     Ok(session)
@@ -3785,8 +3727,8 @@ pub async fn send_chat_message(
                 // Build combined instructions file (system prompt equivalent for Codex)
                 let codex_instructions_file = {
                     use crate::projects::github_issues::{
-                        get_github_contexts_dir, get_session_advisory_refs, get_session_issue_refs,
-                        get_session_pr_refs, get_session_security_refs,
+                        get_github_contexts_dir, get_session_advisory_refs,
+                        get_session_security_refs,
                     };
                     use crate::projects::linear_issues::get_session_linear_refs;
                     use crate::projects::storage::load_projects_data;
@@ -3894,15 +3836,11 @@ pub async fn send_chat_message(
                     // Collect context file paths (issues, PRs, saved contexts)
                     let mut all_context_paths: Vec<std::path::PathBuf> = Vec::new();
 
-                    let mut issue_keys =
-                        get_session_issue_refs(&thread_app, &thread_session_id).unwrap_or_default();
-                    if let Ok(wt_keys) = get_session_issue_refs(&thread_app, &thread_worktree_id) {
-                        for key in wt_keys {
-                            if !issue_keys.contains(&key) {
-                                issue_keys.push(key);
-                            }
-                        }
-                    }
+                    let issue_keys = get_preferred_issue_refs(
+                        &thread_app,
+                        &thread_session_id,
+                        &thread_worktree_id,
+                    );
                     if !issue_keys.is_empty() {
                         if let Ok(contexts_dir) = get_github_contexts_dir(&thread_app) {
                             for key in &issue_keys {
@@ -3920,15 +3858,8 @@ pub async fn send_chat_message(
                         }
                     }
 
-                    let mut pr_keys =
-                        get_session_pr_refs(&thread_app, &thread_session_id).unwrap_or_default();
-                    if let Ok(wt_keys) = get_session_pr_refs(&thread_app, &thread_worktree_id) {
-                        for key in wt_keys {
-                            if !pr_keys.contains(&key) {
-                                pr_keys.push(key);
-                            }
-                        }
-                    }
+                    let pr_keys =
+                        get_preferred_pr_refs(&thread_app, &thread_session_id, &thread_worktree_id);
                     if !pr_keys.is_empty() {
                         if let Ok(contexts_dir) = get_github_contexts_dir(&thread_app) {
                             for key in &pr_keys {
@@ -4192,8 +4123,8 @@ pub async fn send_chat_message(
 
                 let system_prompt = {
                     use crate::projects::github_issues::{
-                        get_github_contexts_dir, get_session_advisory_refs, get_session_issue_refs,
-                        get_session_pr_refs, get_session_security_refs,
+                        get_github_contexts_dir, get_session_advisory_refs,
+                        get_session_security_refs,
                     };
                     use crate::projects::linear_issues::get_session_linear_refs;
                     use crate::projects::storage::load_projects_data;
@@ -4288,15 +4219,11 @@ pub async fn send_chat_message(
                     // Collect and inline context files (issues, PRs, saved contexts)
                     let mut context_content = String::new();
 
-                    let mut issue_keys =
-                        get_session_issue_refs(&thread_app, &thread_session_id).unwrap_or_default();
-                    if let Ok(wt_keys) = get_session_issue_refs(&thread_app, &thread_worktree_id) {
-                        for key in wt_keys {
-                            if !issue_keys.contains(&key) {
-                                issue_keys.push(key);
-                            }
-                        }
-                    }
+                    let issue_keys = get_preferred_issue_refs(
+                        &thread_app,
+                        &thread_session_id,
+                        &thread_worktree_id,
+                    );
                     if !issue_keys.is_empty() {
                         if let Ok(contexts_dir) = get_github_contexts_dir(&thread_app) {
                             for key in &issue_keys {
@@ -4315,15 +4242,8 @@ pub async fn send_chat_message(
                         }
                     }
 
-                    let mut pr_keys =
-                        get_session_pr_refs(&thread_app, &thread_session_id).unwrap_or_default();
-                    if let Ok(wt_keys) = get_session_pr_refs(&thread_app, &thread_worktree_id) {
-                        for key in wt_keys {
-                            if !pr_keys.contains(&key) {
-                                pr_keys.push(key);
-                            }
-                        }
-                    }
+                    let pr_keys =
+                        get_preferred_pr_refs(&thread_app, &thread_session_id, &thread_worktree_id);
                     if !pr_keys.is_empty() {
                         if let Ok(contexts_dir) = get_github_contexts_dir(&thread_app) {
                             for key in &pr_keys {

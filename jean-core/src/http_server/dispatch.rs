@@ -875,11 +875,13 @@ pub async fn dispatch_command(
         }
         "get_issue_context_content" => {
             let session_id: String = field(&args, "sessionId", "session_id")?;
+            let worktree_id: Option<String> = field_opt(&args, "worktreeId", "worktree_id")?;
             let issue_number: u32 = field(&args, "issueNumber", "issue_number")?;
             let project_path: String = field(&args, "projectPath", "project_path")?;
             let result = crate::projects::get_issue_context_content(
                 app.clone(),
                 session_id,
+                worktree_id,
                 issue_number,
                 project_path,
             )
@@ -888,11 +890,13 @@ pub async fn dispatch_command(
         }
         "get_pr_context_content" => {
             let session_id: String = field(&args, "sessionId", "session_id")?;
+            let worktree_id: Option<String> = field_opt(&args, "worktreeId", "worktree_id")?;
             let pr_number: u32 = field(&args, "prNumber", "pr_number")?;
             let project_path: String = field(&args, "projectPath", "project_path")?;
             let result = crate::projects::get_pr_context_content(
                 app.clone(),
                 session_id,
+                worktree_id,
                 pr_number,
                 project_path,
             )

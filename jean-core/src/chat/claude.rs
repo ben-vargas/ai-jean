@@ -6,8 +6,8 @@ use super::types::{
 };
 use crate::http_server::EmitExt;
 use crate::projects::github_issues::{
-    get_github_contexts_dir, get_session_advisory_refs, get_session_issue_refs,
-    get_session_pr_refs, get_session_security_refs,
+    get_github_contexts_dir, get_preferred_issue_refs, get_preferred_pr_refs,
+    get_session_advisory_refs, get_session_security_refs,
 };
 use crate::projects::linear_issues::get_session_linear_refs;
 use crate::projects::sentry_issues::get_session_sentry_refs;
@@ -762,16 +762,7 @@ fn build_claude_args(
     let mut all_context_paths: Vec<std::path::PathBuf> = Vec::new();
 
     // Check for issue context files (shared storage)
-    // Merge session_id refs + worktree_id refs (worktree refs cover PR/issue-based worktrees
-    // where the background thread may not have copied refs to the session yet)
-    let mut issue_keys = get_session_issue_refs(app, session_id).unwrap_or_default();
-    if let Ok(wt_keys) = get_session_issue_refs(app, worktree_id) {
-        for key in wt_keys {
-            if !issue_keys.contains(&key) {
-                issue_keys.push(key);
-            }
-        }
-    }
+    let issue_keys = get_preferred_issue_refs(app, session_id, worktree_id);
     if !issue_keys.is_empty() {
         if let Ok(contexts_dir) = get_github_contexts_dir(app) {
             log::debug!(
@@ -796,14 +787,7 @@ fn build_claude_args(
     }
 
     // Check for PR context files (shared storage)
-    let mut pr_keys = get_session_pr_refs(app, session_id).unwrap_or_default();
-    if let Ok(wt_keys) = get_session_pr_refs(app, worktree_id) {
-        for key in wt_keys {
-            if !pr_keys.contains(&key) {
-                pr_keys.push(key);
-            }
-        }
-    }
+    let pr_keys = get_preferred_pr_refs(app, session_id, worktree_id);
     if !pr_keys.is_empty() {
         if let Ok(contexts_dir) = get_github_contexts_dir(app) {
             for key in pr_keys {
