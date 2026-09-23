@@ -1808,8 +1808,6 @@ export function useSendMessage() {
       chromeEnabled?: boolean
       customProfileName?: string
       backend?: string
-      /** Set by the queue processor — its onError requeues the original message */
-      fromQueue?: boolean
       /** When false, skip the end-of-turn recap instruction. */
       includeRecap?: boolean
     }): Promise<ChatMessage> => {
@@ -2027,10 +2025,8 @@ export function useSendMessage() {
         return
       }
 
-      // Benign race: another queue consumer (backend drain / another client)
-      // started a run for this session first. Queued messages are requeued by
-      // the queue processor's per-call onError. Direct submits restore the
-      // draft so typed text isn't lost.
+      // Benign race: the backend queue drain started a run first. Restore a
+      // direct submit to the draft so typed text is not lost.
       //
       // After cancel, a brief residual race can still produce this error while
       // the cancelled worker tears down (#329). Do NOT leave sending sticky —
@@ -2038,21 +2034,18 @@ export function useSendMessage() {
       if (isDuplicateSendError(error)) {
         logger.warn('Duplicate send rejected — another run is active', {
           sessionId,
-          fromQueue: variables.fromQueue ?? false,
         })
-        if (!variables.fromQueue) {
-          const {
-            inputDrafts,
-            setInputDraft,
-            removeSendingSession,
-            clearExecutingMode,
-          } = useChatStore.getState()
-          if (!inputDrafts[sessionId]?.trim()) {
-            setInputDraft(sessionId, variables.message)
-          }
-          removeSendingSession(sessionId)
-          clearExecutingMode(sessionId)
+        const {
+          inputDrafts,
+          setInputDraft,
+          removeSendingSession,
+          clearExecutingMode,
+        } = useChatStore.getState()
+        if (!inputDrafts[sessionId]?.trim()) {
+          setInputDraft(sessionId, variables.message)
         }
+        removeSendingSession(sessionId)
+        clearExecutingMode(sessionId)
         // Drop the optimistic user message by refetching authoritative state
         queryClient.invalidateQueries({
           queryKey: chatQueryKeys.session(sessionId),
@@ -2817,22 +2810,6 @@ export function persistEnqueue(
 }
 
 /**
- * Atomically dequeue a message from the backend.
- * Returns the dequeued message or null if queue was empty (another client won the race).
- */
-export async function persistDequeue(
-  worktreeId: string,
-  worktreePath: string,
-  sessionId: string
-): Promise<QueuedMessage | null> {
-  return invoke<QueuedMessage | null>('dequeue_message', {
-    worktreeId,
-    worktreePath,
-    sessionId,
-  })
-}
-
-/**
  * Persist removal of a specific queued message.
  */
 export function persistRemoveQueued(
@@ -2953,31 +2930,6 @@ export async function steerGrokTurn(
   message: string
 ): Promise<void> {
   await invoke('steer_grok_turn', { worktreeId, sessionId, message })
-}
-
-/**
- * Re-insert a message at the FRONT of the persisted queue (sequenced enqueue +
- * move-to-front). Used when a send lost the race against another queue
- * consumer and must be retried once the active run completes.
- */
-export async function persistRequeueFront(
-  worktreeId: string,
-  worktreePath: string,
-  sessionId: string,
-  message: QueuedMessage
-): Promise<void> {
-  await invoke('enqueue_message', {
-    worktreeId,
-    worktreePath,
-    sessionId,
-    message,
-  })
-  await invoke('move_queued_message_front', {
-    worktreeId,
-    worktreePath,
-    sessionId,
-    messageId: message.id,
-  })
 }
 
 /**

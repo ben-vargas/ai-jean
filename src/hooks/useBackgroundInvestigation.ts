@@ -41,11 +41,10 @@ type InvestigationType =
  *
  * Owns the entire auto-investigate path for both CMD+Click background creates
  * and foreground creates that open a session modal. Always queues the prompt
- * through `start_background_investigation` so remote/web clients (where the
- * frontend queue processor does not drain) still start investigations even when
+ * through `start_background_investigation` so the backend starts it even when
  * the worktree becomes active or opens in a modal.
  *
- * Must be mounted at App level alongside useQueueProcessor.
+ * Must be mounted at App level.
  */
 export function useBackgroundInvestigation(): void {
   const { data: preferences } = usePreferences()

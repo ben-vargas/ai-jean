@@ -76,7 +76,6 @@ import { useAgentBrowserUpdateCheck } from './hooks/useAgentBrowserUpdateCheck'
 import { useServerUpdateCheck } from './hooks/useServerUpdateCheck'
 import { useCodexCodeModeHostRepair } from './hooks/useCodexCodeModeHostRepair'
 import { useServerQuerySync } from './hooks/useServerQuerySync'
-import { useQueueProcessor } from './hooks/useQueueProcessor'
 import { useBackgroundInvestigation } from './hooks/useBackgroundInvestigation'
 import { useAutoArchiveOnMerge } from './hooks/useAutoArchiveOnMerge'
 import { useMagicPromptAutoDefaults } from './hooks/useMagicPromptAutoDefaults'
@@ -902,10 +901,6 @@ function App() {
       window.location.reload()
     })
   }, [captureWebReloadState, webBackend])
-
-  // Global queue processor - must be at App level so queued messages execute
-  // even when the worktree is not focused (ChatWindow unmounted)
-  useQueueProcessor()
 
   // Headless background investigation - starts investigations on background
   // worktrees (CMD+Click) without opening the session modal

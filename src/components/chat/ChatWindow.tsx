@@ -1659,9 +1659,6 @@ function ChatWindowContent({
     })
   }, [getMcpConfig, loadedIssueContexts, sendMessageNow])
 
-  // Note: Queue processing moved to useQueueProcessor hook in App.tsx
-  // This ensures queued messages execute even when the worktree is unfocused
-
   // Git operations hook - handles commit, PR, review, merge operations
   const {
     handleCommit,

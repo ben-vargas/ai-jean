@@ -54,6 +54,11 @@ See [state-management.md](./state-management.md) for detailed patterns.
 
 ### Event-Driven Bridge Architecture
 
+The Rust backend is the only consumer of persisted queued chat prompts. It
+starts the next prompt after a run ends and resumes a queued session when that
+session is opened after a restart. Frontend clients display `queue:updated` and
+`chat:sending` events but must not dequeue or send queued prompts themselves.
+
 Rust and React communicate through three patterns:
 
 ```

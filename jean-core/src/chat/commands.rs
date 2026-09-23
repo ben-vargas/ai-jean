@@ -874,6 +874,12 @@ pub async fn get_session(
     session.messages = messages;
     session.total_runs = loaded.total_runs;
     session.loaded_run_start_index = loaded.loaded_run_start_index;
+
+    // The backend is the only queue consumer. Resume persisted prompts when a
+    // session is opened after a restart; the drain checks active/waiting state.
+    if !session.queued_messages.is_empty() && session.archived_at.is_none() {
+        trigger_backend_queue_drain(app, worktree_id, worktree_path, session_id);
+    }
     Ok(session)
 }
 
@@ -1150,8 +1156,7 @@ async fn drain_backend_queue(
         )
         .await
         {
-            // Lost a send race against another consumer (frontend queue
-            // processor or another client). Re-insert at the queue front so
+            // Lost a send race against a direct client send. Re-insert at the queue front so
             // the message is NOT lost — the active run's completion re-triggers
             // the drain and retries it.
             if e.contains("already has an active request") {

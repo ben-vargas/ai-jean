@@ -56,7 +56,7 @@ static DETACHED_SESSIONS: Lazy<Mutex<HashSet<String>>> = Lazy::new(|| Mutex::new
 ///
 /// The registry-based "actively managed" guard only catches duplicates after a
 /// process/turn is registered, leaving a window where two concurrent sends
-/// (frontend queue processor vs backend queue drain vs another client) both
+/// (backend queue drain vs a direct client send, or two clients) both
 /// pass the check and spawn duplicate runs. This claim is taken atomically at
 /// `send_chat_message` entry and held for the whole call — unless cancel
 /// releases it early so a follow-up send is not stuck (#329).
