@@ -51,6 +51,7 @@ import {
   TooltipContent,
 } from '@/components/ui/tooltip'
 import { useSidebarWidth } from '@/components/layout/SidebarWidthContext'
+import { CollapsedCountBadge } from './CollapsedCountBadge'
 
 interface WorktreeItemProps {
   worktree: Worktree
@@ -842,6 +843,11 @@ export function WorktreeItem({
               <TooltipContent>{`Uncommitted: +${uncommittedAdded}/-${uncommittedRemoved} lines`}</TooltipContent>
             </Tooltip>
           )}
+          <CollapsedCountBadge
+            count={sessionsData?.sessions.length ?? 0}
+            label="sessions"
+            isExpanded={isExpanded}
+          />
         </div>
       </WorktreeContextMenu>
 
