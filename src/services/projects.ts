@@ -3511,6 +3511,7 @@ export function useMoveItem() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectsQueryKeys.list() })
+      queryClient.invalidateQueries({ queryKey: ['multi-server', 'projects'] })
     },
     onError: error => {
       const message =
@@ -3594,6 +3595,7 @@ export function useReorderItems() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: projectsQueryKeys.list() })
+      queryClient.invalidateQueries({ queryKey: ['multi-server', 'projects'] })
     },
   })
 }

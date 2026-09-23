@@ -40,6 +40,7 @@ import { announceDrag } from '@/lib/drag-and-drop/live-region'
 import { DropIndicator } from '@/components/drag-and-drop/DropIndicator'
 import { groupProjectsByServer } from './project-server-sections'
 import { RemoteServerRefreshButton } from '@/components/remote/RemoteServerRefreshButton'
+import { haveSameProjectServer } from './project-tree-drag'
 
 const MAX_NESTING_DEPTH = 3
 
@@ -81,6 +82,7 @@ function canMoveIntoFolder({
   const activeItem = projectById.get(activeId)
   const folder = projectById.get(folderId)
   if (!activeItem || !folder || !isFolder(folder)) return false
+  if (!haveSameProjectServer(activeItem, folder)) return false
 
   const folderDepth = getDepth(projects, folderId)
   const subtreeDepth = isFolder(activeItem)
@@ -158,7 +160,7 @@ function SortableItem({
 
   useEffect(() => {
     const element = elementRef.current
-    if (!element || item.serverId || item.offline || searchQuery) return
+    if (!element || item.offline || searchQuery) return
 
     return combine(
       draggable({
@@ -170,8 +172,16 @@ function SortableItem({
       }),
       dropTargetForElements({
         element,
-        canDrop: ({ source }) =>
-          isProjectTreeDragData(source.data) && source.data.itemId !== item.id,
+        canDrop: ({ source }) => {
+          if (!isProjectTreeDragData(source.data)) return false
+          const sourceItem = allProjects.find(
+            project => project.id === source.data.itemId
+          )
+          return (
+            source.data.itemId !== item.id &&
+            haveSameProjectServer(sourceItem, item)
+          )
+        },
         getData: ({ input, element, source }) => {
           const sourceId = isProjectTreeDragData(source.data)
             ? source.data.itemId
@@ -228,8 +238,7 @@ function SortableItem({
         style={style}
         className={cn(
           'relative transition-opacity',
-          !item.serverId &&
-            !item.offline &&
+          !item.offline &&
             (activeId === item.id ? 'cursor-grabbing' : 'cursor-grab')
         )}
       >
@@ -259,8 +268,7 @@ function SortableItem({
       style={style}
       className={cn(
         'relative transition-opacity',
-        !item.serverId &&
-          !item.offline &&
+        !item.offline &&
           (activeId === item.id ? 'cursor-grabbing' : 'cursor-grab')
       )}
     >

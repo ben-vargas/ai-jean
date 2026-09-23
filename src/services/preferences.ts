@@ -186,10 +186,12 @@ export function usePatchPreferences() {
 
   return useMutation({
     onMutate: patch => {
-      const [clientPatch] = splitClientPreferencePatch(patch)
-      if (Object.keys(clientPatch).length === 0) return
+      // Keep every consumer of this server's preferences in sync immediately.
+      // New-session creation can run before the persistence request and its
+      // follow-up refetch finish, especially when this client controls a
+      // remote Jean instance.
       queryClient.setQueryData<AppPreferences>(queryKey, current =>
-        current ? { ...current, ...clientPatch } : current
+        current ? { ...current, ...patch } : current
       )
     },
     mutationFn: async (patch: Partial<AppPreferences>) => {
@@ -238,6 +240,11 @@ export function usePatchPreferences() {
         queryKey,
       })
       logger.info('Preferences cache invalidated after patch')
+    },
+    onError: () => {
+      // The optimistic values were not saved. Reload the authoritative values
+      // instead of leaving defaults that only appear to be active.
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 }

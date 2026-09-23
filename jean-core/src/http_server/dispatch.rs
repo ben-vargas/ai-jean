@@ -2040,6 +2040,7 @@ pub async fn dispatch_command(
             let result =
                 crate::projects::move_item(app.clone(), item_id, new_parent_id, target_index)
                     .await?;
+            emit_cache_invalidation(app, &["projects"]);
             to_value(result)
         }
         "reorder_items" => {

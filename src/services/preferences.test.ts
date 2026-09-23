@@ -380,6 +380,36 @@ describe('preferences service', () => {
         }
       )
     })
+
+    it('updates cached server defaults before the remote save completes', () => {
+      const remoteKey = preferencesQueryKeys.preferences('dev-server')
+      queryClient.setQueryData(remoteKey, {
+        ...defaultPreferences,
+        default_backend: 'claude',
+        default_execution_mode: 'plan',
+      })
+      const { result } = renderHook(() => usePatchPreferences(), {
+        wrapper: createServerWrapper(queryClient, 'dev-server'),
+      })
+
+      act(() => {
+        result.current.mutate({
+          default_backend: 'codex',
+          default_execution_mode: 'yolo',
+          build_backend: 'opencode',
+          yolo_backend: 'cursor',
+        })
+      })
+
+      expect(queryClient.getQueryData<AppPreferences>(remoteKey)).toMatchObject(
+        {
+          default_backend: 'codex',
+          default_execution_mode: 'yolo',
+          build_backend: 'opencode',
+          yolo_backend: 'cursor',
+        }
+      )
+    })
   })
 
   describe('preferencesQueryKeys', () => {

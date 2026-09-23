@@ -116,6 +116,35 @@ describe('server command routing', () => {
     ).toThrow('several Jean servers')
   })
 
+  it('routes and strips every item id in remote reorder commands', () => {
+    expect(
+      resolveServerCommand({
+        itemIds: ['remote:one', 'remote:two'],
+        parentId: 'remote:folder',
+      })
+    ).toEqual({
+      serverId: 'remote',
+      args: {
+        itemIds: ['one', 'two'],
+        parentId: 'folder',
+      },
+    })
+  })
+
+  it('decorates a moved remote project', () => {
+    expect(
+      decorateServerResult('remote', 'move_item', {
+        id: 'project',
+        parent_id: 'folder',
+      })
+    ).toMatchObject({
+      id: 'remote:project',
+      parent_id: 'remote:folder',
+      serverId: 'remote',
+      resourceId: 'project',
+    })
+  })
+
   it('does not route resource ids stored inside UI state', () => {
     expect(
       resolveServerCommand({

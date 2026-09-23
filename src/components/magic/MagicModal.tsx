@@ -138,6 +138,7 @@ type MagicOption =
   | 'check-github-issues'
   | 'commit'
   | 'commit-and-push'
+  | 'comment-and-close-issue'
   | 'pull'
   | 'push'
   | 'sync'
@@ -294,6 +295,12 @@ function buildMagicColumns(hasOpenPr: boolean): MagicColumns {
           key: 'P',
         },
         {
+          id: 'comment-and-close-issue',
+          label: 'Comment & Close Issue',
+          icon: Bug,
+          key: 'H',
+        },
+        {
           id: 'revert-last-commit',
           label: 'Revert Commit',
           icon: Undo2,
@@ -398,6 +405,7 @@ const KEY_TO_OPTION: Record<string, MagicOption> = {
   q: 'check-github-issues',
   c: 'commit',
   p: 'commit-and-push',
+  h: 'comment-and-close-issue',
   t: 'sync',
   d: 'pull',
   u: 'push',
@@ -2448,6 +2456,7 @@ ${resolveInstructions}`
     const isSelected = selectedOption === option.id
     const isDisabled =
       (isOnCanvas && !CANVAS_ALLOWED_OPTIONS.has(option.id)) ||
+      (option.id === 'comment-and-close-issue' && !hasIssueContexts) ||
       (option.id === 'investigate-issue' &&
         !hasIssueContexts &&
         !hasSentryContexts) ||

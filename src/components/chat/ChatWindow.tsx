@@ -1634,6 +1634,28 @@ function ChatWindowContent({
     })
   }, [getMcpConfig, sendMessageNow])
 
+  const handleCommentAndCloseIssue = useCallback(() => {
+    sendMessageNow({
+      id: generateId(),
+      message:
+        'Find the full SHA of the latest commit on this worktree. For each GitHub issue loaded in this session context, add a comment containing exactly "Fixed in <commit SHA>" with that SHA in place of <commit SHA>. Add no other text to the comment. Then close the issue. Do not change any other issue.',
+      pendingImages: [],
+      pendingFiles: [],
+      pendingSkills: [],
+      pendingTextFiles: [],
+      model: selectedModelRef.current,
+      provider: selectedProviderRef.current,
+      executionMode: executionModeRef.current,
+      thinkingLevel: selectedThinkingLevelRef.current,
+      effortLevel: useAdaptiveThinkingRef.current
+        ? selectedEffortLevelRef.current
+        : undefined,
+      mcpConfig: getMcpConfig(),
+      backend: selectedBackendRef.current,
+      queuedAt: Date.now(),
+    })
+  }, [getMcpConfig, sendMessageNow])
+
   // Note: Queue processing moved to useQueueProcessor hook in App.tsx
   // This ensures queued messages execute even when the worktree is unfocused
 
@@ -1898,6 +1920,7 @@ function ChatWindowContent({
     handleCheckGitHubIssues,
     handleCommit,
     handleCommitAndPush: handleCommitAndPushWithPicker,
+    handleCommentAndCloseIssue,
     handlePull: handlePullWithPicker,
     handlePush: handlePushWithPicker,
     handleRevertLastCommit,

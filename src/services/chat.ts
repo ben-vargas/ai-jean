@@ -1885,6 +1885,10 @@ export function useSendMessage() {
         timestamp: Math.floor(Date.now() / 1000),
         tool_calls: [],
         model,
+        // Keep the optimistic row on the explicitly selected backend. Model
+        // catalogs can expose new IDs before this client knows how to infer
+        // them, especially when using Jean from another app instance.
+        backend: backend as Backend | undefined,
         execution_mode: executionMode,
         thinking_level:
           backend === 'cursor' || backend === 'grok'

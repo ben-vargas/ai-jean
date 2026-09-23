@@ -40,6 +40,7 @@ const mocks = vi.hoisted(() => {
     gitPush: vi.fn(),
     openExternal: vi.fn(),
     activeWorktreePath: null as string | null,
+    hasIssueContexts: false,
     selectedWorktreeId: 'wt-1',
     installedBackendsOptions: vi.fn(),
     preferencesServerId: vi.fn(),
@@ -182,7 +183,9 @@ vi.mock('@/services/projects', () => ({
 }))
 
 vi.mock('@/services/github', () => ({
-  useLoadedIssueContexts: () => ({ data: [] }),
+  useLoadedIssueContexts: () => ({
+    data: mocks.hasIssueContexts ? [{ number: 123 }] : [],
+  }),
   useLoadedPRContexts: () => ({ data: [] }),
   useLoadedAdvisoryContexts: () => ({ data: [] }),
 }))
@@ -277,6 +280,7 @@ describe('MagicModal manual PR link', () => {
     mocks.worktree.pr_number = null
     mocks.worktree.pr_url = null
     mocks.activeWorktreePath = null
+    mocks.hasIssueContexts = false
     mocks.selectedWorktreeId = 'wt-1'
     mocks.invokeMock.mockImplementation((command: string) => {
       if (command === 'detect_and_link_pr') return Promise.resolve(null)
@@ -665,6 +669,31 @@ describe('MagicModal manual PR link', () => {
     expect(
       screen.getByRole('button', { name: /check github issues/i })
     ).toBeInTheDocument()
+  })
+
+  it('only sends the comment and close issue action when issue context is loaded', async () => {
+    const user = userEvent.setup()
+    mocks.activeWorktreePath = '/repo/worktree'
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
+    const { rerender } = render(<MagicModal />)
+    const action = screen.getByRole('button', {
+      name: /comment & close issue/i,
+    })
+    expect(action).toBeDisabled()
+
+    mocks.hasIssueContexts = true
+    rerender(<MagicModal />)
+    await user.click(
+      screen.getByRole('button', { name: /comment & close issue/i })
+    )
+
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'magic-command',
+        detail: { command: 'comment-and-close-issue' },
+      })
+    )
+    dispatchSpy.mockRestore()
   })
 
   it('does not show the removed smoke test magic command', () => {
