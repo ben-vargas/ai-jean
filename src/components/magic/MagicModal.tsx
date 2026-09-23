@@ -14,6 +14,7 @@ import {
   Wand2,
   BookmarkPlus,
   Bug,
+  CircleDot,
   RefreshCw,
   Undo2,
   Link2,
@@ -364,7 +365,7 @@ function buildMagicColumns(hasOpenPr: boolean): MagicColumns {
     {
       header: 'Investigate',
       options: [
-        { id: 'investigate-issue', label: 'Issue', icon: Bug, key: 'I' },
+        { id: 'investigate-issue', label: 'Issue', icon: CircleDot, key: 'I' },
         {
           id: 'investigate-pr',
           label: 'PR',

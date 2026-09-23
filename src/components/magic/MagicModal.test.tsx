@@ -322,6 +322,16 @@ describe('MagicModal manual PR link', () => {
     expect(mobileMenu.querySelector('kbd')).not.toBeInTheDocument()
   })
 
+  it('uses the issue icon for the Issue investigation action', () => {
+    render(<MagicModal />)
+
+    const issueAction = within(
+      screen.getByTestId('magic-column-right')
+    ).getByRole('button', { name: 'Issue I' })
+    expect(issueAction.querySelector('svg circle')).toBeInTheDocument()
+    expect(issueAction.querySelector('svg path')).not.toBeInTheDocument()
+  })
+
   it('opens a Link PR dialog and shows checking state while searching current branch', async () => {
     const user = userEvent.setup()
     let resolveDetection:
