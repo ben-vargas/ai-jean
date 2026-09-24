@@ -643,6 +643,7 @@ export class WsTransport {
   private static readonly EVENT_BUFFER_MAX_AGE = 5_000
   private static readonly EVENT_BUFFER_MAX_SIZE = 50
   private _connected = false
+  private _checkingConnection = false
   private _hasConnectedOnce = false
   private _connecting = false
   private _authError: string | null = null
@@ -672,6 +673,16 @@ export class WsTransport {
 
   get authError(): string | null {
     return this._authError
+  }
+
+  getCheckingConnectionSnapshot(): boolean {
+    return this._checkingConnection
+  }
+
+  private setCheckingConnection(value: boolean): void {
+    if (this._checkingConnection === value) return
+    this._checkingConnection = value
+    this.notifySubscribers()
   }
 
   private setConnected(value: boolean): void {
@@ -867,6 +878,7 @@ export class WsTransport {
       this.startLivenessTimer()
       this._hasConnectedOnce = true
       this.setConnected(true)
+      this.setCheckingConnection(false)
       this.connectRetryAttempt = 0
 
       // Flush queued messages
@@ -986,6 +998,7 @@ export class WsTransport {
    *  ping/pong alone is not visible to browser JavaScript. */
   private static readonly INBOUND_TIMEOUT = 50_000
   private static readonly LIVENESS_CHECK_INTERVAL = 10_000
+  private static readonly WAKE_CHECK_TIMEOUT = 3_000
 
   /** Call a backend command over WebSocket. */
   async invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
@@ -1252,7 +1265,9 @@ export class WsTransport {
         } catch {
           // Ignore close errors; a successful close triggers the app reload.
         }
+        return
       }
+      if (!this.config && !isNativeApp()) this.checkConnectionAfterWake()
       return
     }
 
@@ -1264,6 +1279,37 @@ export class WsTransport {
     }
     this.connectRetryAttempt = 0
     this.connect()
+  }
+
+  /** A mobile browser can report OPEN for a socket that died while suspended.
+   *  Block stale UI until a request proves this connection can still reply. */
+  private checkConnectionAfterWake(): void {
+    if (this._checkingConnection) return
+    const socket = this.ws
+    if (!socket) return
+    this.setCheckingConnection(true)
+
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    void Promise.race([
+      this.invoke('get_server_platform'),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error('Connection check timed out')),
+          WsTransport.WAKE_CHECK_TIMEOUT
+        )
+      }),
+    ])
+      .then(() => {
+        if (this.ws === socket && this._connected) {
+          this.setCheckingConnection(false)
+        }
+      })
+      .catch(() => {
+        if (this.ws === socket) socket.close()
+      })
+      .finally(() => {
+        if (timeout) clearTimeout(timeout)
+      })
   }
 
   private restartConnectionAttempt(): void {
@@ -1315,6 +1361,7 @@ export class WsTransport {
     this.listeners.clear()
     this.eventBuffer.clear()
     this._connected = false
+    this._checkingConnection = false
     this._subscribers.clear()
   }
 
@@ -1348,6 +1395,8 @@ export function getLegacyWsTransport(): WsTransport {
 
 const subscribe = (cb: () => void) => wsTransport.subscribe(cb)
 const getSnapshot = () => wsTransport.getSnapshot()
+const getCheckingConnectionSnapshot = () =>
+  wsTransport.getCheckingConnectionSnapshot()
 const getAuthErrorSnapshot = () => wsTransport.getAuthErrorSnapshot()
 const getAuthReasonSnapshot = () => wsTransport.getAuthReasonSnapshot()
 
@@ -1366,6 +1415,13 @@ export function useWsConnectionStatus(): boolean {
   return useSyncExternalStore(
     isE2eMocked ? noopSubscribe : subscribe,
     isE2eMocked ? () => true : getSnapshot
+  )
+}
+
+export function useWsConnectionChecking(): boolean {
+  return useSyncExternalStore(
+    isE2eMocked ? noopSubscribe : subscribe,
+    isE2eMocked ? () => false : getCheckingConnectionSnapshot
   )
 }
 

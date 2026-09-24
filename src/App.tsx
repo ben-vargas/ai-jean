@@ -5,6 +5,7 @@ import {
   ingestBootstrapEvents,
   invoke,
   useWsConnectionStatus,
+  useWsConnectionChecking,
   useWsAuthError,
   useWsAuthReason,
   preloadInitialData,
@@ -917,6 +918,7 @@ function App() {
   // terminals alive, so reloading behaves like reopening Jean without losing
   // backend work.
   const wsConnected = useWsConnectionStatus()
+  const wsCheckingConnection = useWsConnectionChecking()
   useEffect(() => {
     if (!webBackend || !wsConnected) return
 
@@ -1571,6 +1573,9 @@ function App() {
     <ErrorBoundary>
       <ThemeProvider>
         <MainWindow />
+        {webBackend && wsCheckingConnection && (
+          <JeanLoadingScreen message="Checking connection to Jean..." onTop />
+        )}
         {webBackend && <WsAuthErrorOverlay />}
         {/* App-level dialog so quit confirmation wins over loading overlay
             even if MainWindow's copy is covered / not yet mounted. */}
