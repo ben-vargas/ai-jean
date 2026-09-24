@@ -26,9 +26,13 @@ export function sortSessionCardsForTabs(
  */
 export function resolveModalSessionId(
   activeSessionId: string | undefined,
-  sessionIds: readonly string[]
+  sessionIds: readonly string[],
+  backendActiveSessionId?: string | null
 ): string | null {
   if (activeSessionId) return activeSessionId
+  if (backendActiveSessionId && sessionIds.includes(backendActiveSessionId)) {
+    return backendActiveSessionId
+  }
   return sessionIds[0] ?? null
 }
 

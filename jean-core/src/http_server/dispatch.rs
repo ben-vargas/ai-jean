@@ -208,14 +208,14 @@ pub async fn dispatch_command(
             let project_ids: Option<Vec<String>> = field_opt(&args, "projectIds", "project_ids")?;
             let offset: Option<usize> = from_field_opt(&args, "offset")?;
             let limit: Option<usize> = from_field_opt(&args, "limit")?;
-            let include_session_id: Option<String> =
-                field_opt(&args, "includeSessionId", "include_session_id")?;
+            let include_session_ids: Option<Vec<String>> =
+                field_opt(&args, "includeSessionIds", "include_session_ids")?;
             let result = crate::projects::get_recent_worktrees(
                 app.clone(),
                 project_ids,
                 offset,
                 limit,
-                include_session_id,
+                include_session_ids,
             )
             .await?;
             to_value(result)

@@ -102,11 +102,13 @@ describe('RecentWorktreesList structure', () => {
     expect(source).toContain("status.tone !== 'completed'")
   })
 
-  it('does not create a different cached list for each selected session', () => {
+  it('fetches pinned sessions without creating a list for each selected session', () => {
     expect(source).toContain(
-      "queryKey: ['recent-worktrees', projectKey, limit]"
+      "queryKey: ['recent-worktrees', projectKey, limit, pinnedSessionIds]"
     )
-    expect(source).toContain('fetchRecentWorktrees(projects, limit, null)')
+    expect(source).toContain(
+      'fetchRecentWorktrees(projects, limit, pinnedSessionIds)'
+    )
     expect(source).not.toContain(
       "queryKey: ['recent-worktrees', projectKey, limit, selectedSessionId]"
     )

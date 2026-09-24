@@ -223,7 +223,8 @@ export function SessionChatModal({
   }, [])
   const { data: sessionsData } = useSessions(
     worktreeId || null,
-    worktreePath || null
+    worktreePath || null,
+    { refetchOnMount: 'always' }
   )
   const sessions = useMemo(
     () => sessionsData?.sessions ?? [],
@@ -236,7 +237,8 @@ export function SessionChatModal({
   )
   const currentSessionId = resolveModalSessionId(
     activeSessionId,
-    sessions.map(session => session.id)
+    sessions.map(session => session.id),
+    sessionsData?.active_session_id
   )
   const activeSessionIsListed =
     !!currentSessionId &&

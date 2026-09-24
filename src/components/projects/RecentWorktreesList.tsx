@@ -109,8 +109,8 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
     // Selection only changes the highlighted row. Keep it out of the query so
     // switching sessions cannot swap between cached list variants with
     // different ordering.
-    queryKey: ['recent-worktrees', projectKey, limit],
-    queryFn: () => fetchRecentWorktrees(projects, limit, null),
+    queryKey: ['recent-worktrees', projectKey, limit, pinnedSessionIds],
+    queryFn: () => fetchRecentWorktrees(projects, limit, pinnedSessionIds),
     enabled: projects.length > 0,
     placeholderData: keepPreviousData,
     staleTime: 30_000,

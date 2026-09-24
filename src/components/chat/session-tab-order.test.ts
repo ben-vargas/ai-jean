@@ -87,6 +87,20 @@ describe('resolveModalSessionId', () => {
   it('returns null when there is no active session and no sessions', () => {
     expect(resolveModalSessionId(undefined, [])).toBeNull()
   })
+
+  it('selects the backend last-used session when the client has none', () => {
+    expect(
+      resolveModalSessionId(undefined, ['first', 'last-used'], 'last-used')
+    ).toBe('last-used')
+  })
+
+  it('selects the only empty session when the client has none', () => {
+    expect(resolveModalSessionId(undefined, ['empty'], null)).toBe('empty')
+  })
+
+  it('ignores a backend selection absent from the current list', () => {
+    expect(resolveModalSessionId(undefined, ['empty'], 'removed')).toBe('empty')
+  })
 })
 
 describe('resolveInitialActiveSessionId', () => {

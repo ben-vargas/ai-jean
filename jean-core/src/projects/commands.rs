@@ -1138,7 +1138,7 @@ pub async fn get_recent_worktrees(
     project_ids: Option<Vec<String>>,
     offset: Option<usize>,
     limit: Option<usize>,
-    include_session_id: Option<String>,
+    include_session_ids: Option<Vec<String>>,
 ) -> Result<RecentWorktreesResponse, String> {
     let data = load_projects_data(&app)?;
     let project_filter =
@@ -1217,12 +1217,13 @@ pub async fn get_recent_worktrees(
     let offset = offset.unwrap_or(0).min(total);
     let limit = limit.unwrap_or(10).clamp(1, 100);
     let mut page = items[offset..total.min(offset + limit)].to_vec();
-    if let Some(include_id) = include_session_id {
-        if !page.iter().any(|item| item.session.id == include_id) {
-            if let Some(item) = items.into_iter().find(|item| item.session.id == include_id) {
-                page.push(item);
-            }
-        }
+    if let Some(include_ids) = include_session_ids {
+        let include_ids: std::collections::HashSet<_> = include_ids.into_iter().collect();
+        let visible_ids: std::collections::HashSet<_> =
+            page.iter().map(|item| item.session.id.clone()).collect();
+        page.extend(items.into_iter().filter(|item| {
+            include_ids.contains(&item.session.id) && !visible_ids.contains(&item.session.id)
+        }));
     }
     Ok(RecentWorktreesResponse {
         items: page,

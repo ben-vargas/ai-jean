@@ -241,7 +241,15 @@ describe('SessionChatModal removal behavior', () => {
     const source = readSource('src/components/chat/SessionChatModal.tsx')
 
     expect(source).toMatch(
-      /resolveModalSessionId\(\s*activeSessionId,\s*sessions\.map\(session => session\.id\)\s*\)/
+      /resolveModalSessionId\(\s*activeSessionId,\s*sessions\.map\(session => session\.id\),\s*sessionsData\?\.active_session_id\s*\)/
+    )
+  })
+
+  it('refreshes the session list when the modal opens', () => {
+    const source = readSource('src/components/chat/SessionChatModal.tsx')
+
+    expect(source).toMatch(
+      /useSessions\(\s*worktreeId \|\| null,\s*worktreePath \|\| null,\s*\{ refetchOnMount: 'always' \}\s*\)/
     )
   })
 

@@ -138,7 +138,7 @@ export interface RecentWorktreesData {
 export async function fetchRecentWorktrees(
   projects: Project[],
   limit: number,
-  includeSessionId: string | null
+  includeSessionIds: string[]
 ): Promise<RecentWorktreesData> {
   const projectsByServer = new Map<string, Project[]>()
   for (const project of projects.filter(
@@ -153,16 +153,11 @@ export async function fetchRecentWorktrees(
   const serverEntries = [...projectsByServer]
   const results = await Promise.allSettled(
     serverEntries.map(async ([serverId, serverProjects]) => {
-      const selectedRef = includeSessionId
-        ? parseServerResourceKey(includeSessionId)
-        : null
-      const selectedResourceId = selectedRef
-        ? selectedRef.serverId === serverId
-          ? selectedRef.resourceId
-          : null
-        : serverId === LOCAL_SERVER_ID
-          ? includeSessionId
-          : null
+      const serverSessionIds = includeSessionIds.flatMap(sessionId => {
+        const ref = parseServerResourceKey(sessionId)
+        if (ref) return ref.serverId === serverId ? [ref.resourceId] : []
+        return serverId === LOCAL_SERVER_ID ? [sessionId] : []
+      })
       const response = await invokeForServer<RecentWorktreesResponse>(
         serverId,
         'get_recent_worktrees',
@@ -172,7 +167,7 @@ export async function fetchRecentWorktrees(
           ),
           offset: 0,
           limit,
-          includeSessionId: selectedResourceId,
+          includeSessionIds: serverSessionIds,
         }
       )
       return { serverId, response }
@@ -193,12 +188,13 @@ export async function fetchRecentWorktrees(
         a.worktree.id.localeCompare(b.worktree.id)
     )
   const visibleItems = items.slice(0, limit)
-  if (
-    includeSessionId &&
-    !visibleItems.some(item => item.session.id === includeSessionId)
-  ) {
-    const selected = items.find(item => item.session.id === includeSessionId)
-    if (selected) visibleItems.push(selected)
+  const visibleIds = new Set(visibleItems.map(item => item.session.id))
+  const pinnedIds = new Set(includeSessionIds)
+  for (const item of items) {
+    if (pinnedIds.has(item.session.id) && !visibleIds.has(item.session.id)) {
+      visibleItems.push(item)
+      visibleIds.add(item.session.id)
+    }
   }
   return {
     items: visibleItems,

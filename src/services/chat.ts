@@ -364,7 +364,7 @@ export function useChatHistory(
 export function useSessions(
   worktreeId: string | null,
   worktreePath: string | null,
-  options?: { includeMessageCounts?: boolean }
+  options?: { includeMessageCounts?: boolean; refetchOnMount?: 'always' }
 ) {
   const includeMessageCounts = options?.includeMessageCounts ?? false
 
@@ -395,7 +395,7 @@ export function useSessions(
     enabled: !!worktreeId && !!worktreePath,
     staleTime: 1000 * 60 * 5, // 5 minutes - enables instant tab bar rendering from cache
     gcTime: 1000 * 60 * 2,
-    refetchOnMount: true, // Respects staleTime; status changes pushed via streaming/cache:invalidate events
+    refetchOnMount: options?.refetchOnMount ?? true, // Modal openings must also refresh cached empty lists
   })
 }
 
