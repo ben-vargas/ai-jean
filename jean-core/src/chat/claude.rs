@@ -649,6 +649,15 @@ fn build_claude_args(
     // Chrome browser integration (beta)
     if chrome_enabled {
         args.push("--chrome".to_string());
+        // Claude in Chrome asks for per-site approval even in bypassPermissions
+        // mode (allow rules do not skip it), and headless runs deny every ask.
+        // In YOLO, route those asks to Jean MCP, which approves Chrome tools.
+        if execution_mode == Some("yolo") {
+            if let Some(tool) = jean_permission_prompt_tool(mcp_config) {
+                args.push("--permission-prompt-tool".to_string());
+                args.push(tool);
+            }
+        }
     }
 
     // Build combined system prompt parts
@@ -1126,6 +1135,17 @@ fn append_mcp_config_args(args: &mut Vec<String>, mcp_config: Option<&str>) {
             }
         }
     }
+}
+
+/// Jean MCP permission hook tool name, when the Jean MCP server is in `mcp_config`.
+fn jean_permission_prompt_tool(mcp_config: Option<&str>) -> Option<String> {
+    let parsed = serde_json::from_str::<serde_json::Value>(mcp_config?).ok()?;
+    let server_name = crate::jean_mcp_config::current_mode().server_name();
+    parsed.get("mcpServers")?.get(server_name)?;
+    Some(format!(
+        "mcp__{server_name}__{}",
+        crate::jean_mcp_core::CLAUDE_PERMISSION_PROMPT_TOOL
+    ))
 }
 
 /// Execute Claude CLI in detached mode.
@@ -2727,5 +2747,20 @@ mod tests {
         assert!(args.contains(&"mcp__jean-dev__*".to_string()));
         assert!(args.contains(&"mcp__github".to_string()));
         assert!(args.contains(&"mcp__github__*".to_string()));
+    }
+
+    #[test]
+    fn permission_prompt_tool_requires_jean_mcp_server() {
+        let server = crate::jean_mcp_config::current_mode().server_name();
+        let config = format!(r#"{{"mcpServers":{{"{server}":{{"type":"stdio"}}}}}}"#);
+        assert_eq!(
+            jean_permission_prompt_tool(Some(&config)),
+            Some(format!("mcp__{server}__claude_permission_prompt"))
+        );
+        assert_eq!(
+            jean_permission_prompt_tool(Some(r#"{"mcpServers":{"github":{}}}"#)),
+            None
+        );
+        assert_eq!(jean_permission_prompt_tool(None), None);
     }
 }

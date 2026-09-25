@@ -323,6 +323,10 @@ export async function invoke<T>(
         command,
         routed.args
       )
+      // Local IDs stay raw, matching invokeForServer. A base session shares
+      // its project's registered path, so scoping here returned `local:` IDs
+      // for some session calls and raw IDs for others.
+      if (routed.serverId === 'local') return result
       return decorateServerResult(routed.serverId, command, result)
     }
   }

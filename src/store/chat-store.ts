@@ -35,7 +35,8 @@ export interface ScheduledWakeupState extends ScheduledWakeup {
   status: ScheduledWakeupStatus
 }
 import type { StoredReviewResults } from '@/types/projects'
-import { invoke } from '@/lib/transport'
+import { invoke, invokeForServer } from '@/lib/transport'
+import { parseServerResourceKey } from '@/lib/server-resource'
 import type { ClaudeModel, CodexModel, CliBackend } from '@/types/preferences'
 import type { ManualSessionStatus } from '@/components/chat/session-card-utils'
 export type { ClaudeModel, CodexModel }
@@ -988,7 +989,13 @@ export const useChatStore = create<ChatUIState>()(
         )
 
         if (options?.markOpened !== false) {
-          invoke('set_session_last_opened', { sessionId })
+          const resource = parseServerResourceKey(sessionId)
+          const markOpened = resource
+            ? invokeForServer(resource.serverId, 'set_session_last_opened', {
+                sessionId: resource.resourceId,
+              })
+            : invoke('set_session_last_opened', { sessionId })
+          markOpened
             .then(() => {
               window.dispatchEvent(
                 new CustomEvent('session-opened', {

@@ -46,6 +46,7 @@ import { useWsConnectionStatus } from '@/lib/transport'
 import { isNativeApp } from '@/lib/environment'
 import { openExternal, preOpenWindow } from '@/lib/platform'
 import { copyToClipboard } from '@/lib/clipboard'
+import { formatUsagePair } from '@/lib/usage-format'
 import { useUIStore } from '@/store/ui-store'
 import { useChatStore } from '@/store/chat-store'
 import { useProjectsStore } from '@/store/projects-store'
@@ -292,8 +293,7 @@ export function FloatingDock() {
       plan: grokUsage.data?.planType ?? null,
       session: grokUsage.data?.session?.usedPercent ?? null,
       weekly: grokUsage.data?.weekly?.usedPercent ?? null,
-      available:
-        !!grokStatus.data?.installed && !!grokAuth.data?.authenticated,
+      available: !!grokStatus.data?.installed && !!grokAuth.data?.authenticated,
     },
   ].filter(entry => entry.available)
 
@@ -302,15 +302,14 @@ export function FloatingDock() {
     usageEntries[0] ??
     null
 
-  const usageBadge = (() => {
-    const session = activeUsageEntry?.session ?? null
-    const weekly = activeUsageEntry?.weekly ?? null
-    const sessionText = session === null ? '--' : `${Math.round(session)}`
-    const weeklyText = weekly === null ? '--' : `${Math.round(weekly)}`
-    return {
-      text: `${sessionText}|${weeklyText}%`,
-    }
-  })()
+  const usageBadgeText = formatUsagePair(
+    activeUsageEntry?.session,
+    activeUsageEntry?.weekly
+  )
+  const usageBadgeLabel =
+    activeUsageEntry?.session == null && activeUsageEntry?.weekly != null
+      ? 'Weekly'
+      : 'Session|Weekly'
 
   const getActiveResumeCommand = useCallback(() => {
     const { selectedWorktreeId: currentWorktreeId } =
@@ -541,9 +540,7 @@ export function FloatingDock() {
                 Jean on GitHub
               </DropdownMenuItem>
               <DropdownMenuItem
-                onClick={() =>
-                  openExternal('https://jean.build/sponsorships/')
-                }
+                onClick={() => openExternal('https://jean.build/sponsorships/')}
               >
                 <Heart className="mr-2 h-4 w-4 text-pink-500" />
                 Sponsor Jean
@@ -615,13 +612,13 @@ export function FloatingDock() {
                 >
                   <activeUsageEntry.Icon className="size-4 shrink-0 xl:mr-1 xl:size-3.5" />
                   <span className="hidden text-[11px] leading-none tabular-nums xl:inline">
-                    {usageBadge.text}
+                    {usageBadgeText}
                   </span>
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
             <TooltipContent side={popoverSide}>
-              {activeUsageEntry.label} Session|Weekly{' '}
+              {activeUsageEntry.label} {usageBadgeLabel}{' '}
               {showKeybindingHints && (
                 <kbd className="ml-1 text-[0.625rem] opacity-60">
                   {usageShortcut}
@@ -636,10 +633,6 @@ export function FloatingDock() {
             onEscapeKeyDown={e => e.stopPropagation()}
           >
             {usageEntries.map(entry => {
-              const sessionText =
-                entry.session === null ? '--' : `${Math.round(entry.session)}`
-              const weeklyText =
-                entry.weekly === null ? '--' : `${Math.round(entry.weekly)}`
               const planText =
                 entry.plan && entry.plan.trim().length > 0 ? entry.plan : '--'
               return (
@@ -657,7 +650,7 @@ export function FloatingDock() {
                     </span>
                   </div>
                   <DropdownMenuShortcut>
-                    {sessionText}|{weeklyText}%
+                    {formatUsagePair(entry.session, entry.weekly)}
                   </DropdownMenuShortcut>
                 </DropdownMenuItem>
               )

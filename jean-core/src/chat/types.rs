@@ -1260,7 +1260,7 @@ impl SessionMetadata {
             })
     }
 
-    fn updated_at(&self) -> u64 {
+    pub(crate) fn updated_at(&self) -> u64 {
         self.runs
             .last()
             .map(|run| run.ended_at.unwrap_or(run.started_at))

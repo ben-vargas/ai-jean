@@ -341,6 +341,26 @@ describe('transport bootstrap', () => {
     })
   })
 
+  it('keeps local IDs raw for commands routed by a base-session path', async () => {
+    const sessions = {
+      worktree_id: 'worktree-1',
+      active_session_id: 'session-1',
+      sessions: [{ id: 'session-1', worktree_id: 'worktree-1' }],
+    }
+    const tauriInvoke = vi.fn().mockResolvedValue(sessions)
+    const transport = await loadNativeTransportModule(tauriInvoke)
+    const { registerServerResourcePath } =
+      await import('./server-command-routing')
+    registerServerResourcePath('local', '/Users/jean/project')
+
+    const result = await transport.invoke('get_sessions', {
+      worktreeId: 'worktree-1',
+      worktreePath: '/Users/jean/project',
+    })
+
+    expect(result).toEqual(sessions)
+  })
+
   it('opens remote worktrees in local Zed via ssh:// targets', async () => {
     const tauriInvoke = vi.fn().mockResolvedValue(undefined)
     const transport = await loadRemoteNativeTransportModule(

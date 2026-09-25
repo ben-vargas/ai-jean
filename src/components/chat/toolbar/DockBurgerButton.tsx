@@ -47,24 +47,14 @@ import { ClaudeIcon } from '@/components/icons/ClaudeIcon'
 import { CodexIcon } from '@/components/icons/CodexIcon'
 import { GrokIcon } from '@/components/icons/GrokIcon'
 import { openExternal } from '@/lib/platform'
+import { formatUsagePair } from '@/lib/usage-format'
 
 interface DockBurgerButtonProps {
   /** Extra classes merged onto the trigger button (e.g. responsive visibility). */
   className?: string
 }
 
-function formatUsagePair(
-  session: number | null | undefined,
-  weekly: number | null | undefined
-) {
-  const sessionText = session == null ? '--' : `${Math.round(session)}`
-  const weeklyText = weekly == null ? '--' : `${Math.round(weekly)}`
-  return `${sessionText}|${weeklyText}%`
-}
-
-export function DockBurgerButton({
-  className,
-}: DockBurgerButtonProps = {}) {
+export function DockBurgerButton({ className }: DockBurgerButtonProps = {}) {
   const isMobile = useIsMobile()
   const { data: preferences } = usePreferences()
 
@@ -235,17 +225,13 @@ export function DockBurgerButton({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() =>
-                openExternal('https://github.com/coollabsio/jean')
-              }
+              onClick={() => openExternal('https://github.com/coollabsio/jean')}
             >
               <Github className="mr-2 h-4 w-4" />
               Jean on GitHub
             </DropdownMenuItem>
             <DropdownMenuItem
-              onClick={() =>
-                openExternal('https://jean.build/sponsorships/')
-              }
+              onClick={() => openExternal('https://jean.build/sponsorships/')}
             >
               <Heart className="mr-2 h-4 w-4 text-pink-500" />
               Sponsor Jean

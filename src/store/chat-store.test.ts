@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { mockInvoke } = vi.hoisted(() => ({
+const { mockInvoke, mockInvokeForServer } = vi.hoisted(() => ({
   mockInvoke: vi.fn().mockResolvedValue(undefined),
+  mockInvokeForServer: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('@/lib/transport', () => ({
   invoke: mockInvoke,
+  invokeForServer: mockInvokeForServer,
 }))
 
 import { useChatStore } from './chat-store'
@@ -25,6 +27,7 @@ describe('ChatStore', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockInvoke.mockResolvedValue(undefined)
+    mockInvokeForServer.mockResolvedValue(undefined)
 
     useChatStore.setState({
       activeWorktreeId: null,
@@ -161,6 +164,19 @@ describe('ChatStore', () => {
       )
 
       window.removeEventListener('session-opened', handler)
+    })
+
+    it('marks a remote session opened on its owning server', () => {
+      useChatStore
+        .getState()
+        .setActiveSession('remote:worktree-1', 'remote:session-1')
+
+      expect(mockInvokeForServer).toHaveBeenCalledWith(
+        'remote',
+        'set_session_last_opened',
+        { sessionId: 'session-1' }
+      )
+      expect(mockInvoke).not.toHaveBeenCalled()
     })
   })
 

@@ -702,6 +702,70 @@ describe('computeSessionCardData', () => {
     expect(card.status).toBe('yoloing')
   })
 
+  it('does not show a stale Claude question while a later turn is running', () => {
+    const session: Session = {
+      ...createBaseSession(),
+      backend: 'claude',
+      last_run_status: 'running',
+      last_run_execution_mode: 'yolo',
+    }
+    const storeState = createBaseStoreState({
+      sendingSessionIds: { 'session-1': true },
+      executingModes: { 'session-1': 'yolo' },
+      activeToolCalls: {
+        'session-1': [
+          { id: 'old-question', name: 'AskUserQuestion', input: {} },
+        ],
+      },
+    })
+
+    const card = computeSessionCardData(session, storeState)
+
+    expect(card.isWaiting).toBe(false)
+    expect(card.status).toBe('yoloing')
+  })
+
+  it('shows a running Claude turn instead of a hidden old permission denial', () => {
+    const denial = {
+      tool_name: 'Bash',
+      tool_use_id: 'old-denial',
+      tool_input: {},
+    }
+    const session = createBaseSession({
+      backend: 'claude',
+      last_run_status: 'running',
+      last_run_execution_mode: 'yolo',
+      pending_permission_denials: [denial],
+    })
+    const storeState = createBaseStoreState({
+      sendingSessionIds: { 'session-1': true },
+      executingModes: { 'session-1': 'yolo' },
+      pendingPermissionDenials: { 'session-1': [denial] },
+    })
+
+    const card = computeSessionCardData(session, storeState)
+
+    expect(card.hasPermissionDenials).toBe(false)
+    expect(card.isWaiting).toBe(false)
+    expect(card.status).toBe('yoloing')
+  })
+
+  it('does not show a hidden permission denial after a yolo turn completes', () => {
+    const session = createBaseSession({
+      backend: 'claude',
+      last_run_status: 'completed',
+      selected_execution_mode: 'yolo',
+      pending_permission_denials: [
+        { tool_name: 'Bash', tool_use_id: 'old-denial', tool_input: {} },
+      ],
+    })
+
+    const card = computeSessionCardData(session, createBaseStoreState())
+
+    expect(card.hasPermissionDenials).toBe(false)
+    expect(card.status).toBe('completed')
+  })
+
   it('maps cancelled last_run_status to cancelled (not idle)', () => {
     const session = createBaseSession({ last_run_status: 'cancelled' })
     const card = computeSessionCardData(session, createBaseStoreState())

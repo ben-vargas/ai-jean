@@ -2561,17 +2561,10 @@ pub async fn set_active_session(
 pub async fn set_session_last_opened(app: AppHandle, session_id: String) -> Result<(), String> {
     log::trace!("Setting last_opened_at for session: {session_id}");
 
-    if let Ok(Some(mut metadata)) = load_metadata(&app, &session_id) {
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        metadata.last_opened_at = Some(now);
-        if metadata.primary_surface.as_deref() == Some("terminal") {
-            metadata.waiting_for_input = false;
-            metadata.waiting_for_input_type = None;
-        }
-        save_metadata(&app, &metadata)?;
+    if load_metadata(&app, &session_id)?.is_some() {
+        with_existing_metadata_mut(&app, &session_id, |metadata| {
+            acknowledge_session_opened(metadata, current_unix_time());
+        })?;
         // Broadcast so other clients (native ↔ web) drop stale last_opened_at.
         emit_sessions_cache_invalidation(&app);
     }
@@ -2592,21 +2585,15 @@ pub async fn set_sessions_last_opened_bulk(
         session_ids.len()
     );
 
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+    let now = current_unix_time();
 
     let mut updated = false;
     let mut result = Ok(());
     for session_id in &session_ids {
-        if let Ok(Some(mut metadata)) = load_metadata(&app, session_id) {
-            metadata.last_opened_at = Some(now);
-            if metadata.primary_surface.as_deref() == Some("terminal") {
-                metadata.waiting_for_input = false;
-                metadata.waiting_for_input_type = None;
-            }
-            if let Err(error) = save_metadata(&app, &metadata) {
+        if load_metadata(&app, session_id)?.is_some() {
+            if let Err(error) = with_existing_metadata_mut(&app, session_id, |metadata| {
+                acknowledge_session_opened(metadata, now);
+            }) {
                 result = Err(error);
                 break;
             }
@@ -2615,6 +2602,22 @@ pub async fn set_sessions_last_opened_bulk(
     }
 
     finish_bulk_update(updated, result, || emit_sessions_cache_invalidation(&app))
+}
+
+fn current_unix_time() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+fn acknowledge_session_opened(metadata: &mut super::types::SessionMetadata, now: u64) {
+    // Never acknowledge an older snapshot than the latest persisted activity.
+    metadata.last_opened_at = Some(now.max(metadata.updated_at()));
+    if metadata.primary_surface.as_deref() == Some("terminal") {
+        metadata.waiting_for_input = false;
+        metadata.waiting_for_input_type = None;
+    }
 }
 
 /// Auto-name a native terminal session from its first prompt. Terminal
@@ -3060,6 +3063,9 @@ pub async fn send_chat_message(
         if let Some(session) = sessions.find_session_mut(&session_id) {
             session.waiting_for_input = false;
             session.is_reviewing = false;
+            // A new prompt supersedes denials from the previous turn.
+            session.pending_permission_denials.clear();
+            session.denied_message_context = None;
             if session.status_override.as_deref() == Some("review") {
                 session.status_override = None;
             }
@@ -10316,6 +10322,24 @@ mod tests {
 
         session.last_opened_at = Some(session.updated_at);
         assert!(!is_unread_session(&session));
+    }
+
+    #[test]
+    fn opening_session_acknowledges_latest_run_without_clearing_chat_input() {
+        let mut metadata = super::super::types::SessionMetadata::new(
+            "session-1".to_string(),
+            "worktree-1".to_string(),
+            "Session".to_string(),
+            0,
+        );
+        metadata.waiting_for_input = true;
+        metadata.waiting_for_input_type = Some("question".to_string());
+
+        acknowledge_session_opened(&mut metadata, 10);
+
+        assert_eq!(metadata.last_opened_at, Some(metadata.updated_at()));
+        assert!(!metadata.to_unread_summary().is_unread());
+        assert!(metadata.waiting_for_input);
     }
 
     #[test]

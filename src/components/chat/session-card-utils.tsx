@@ -29,6 +29,7 @@ import {
   preferResolvedCliCommand,
 } from '@/services/cli-binary'
 import { findPlanFilePath, resolvePlanContent } from './tool-call-utils'
+import { shouldShowPermissionApproval } from './permission-approval-utils'
 
 /**
  * Lossless session status for canvas/sidebar/tabs/summaries.
@@ -548,8 +549,11 @@ export function computeSessionCardData(
     reviewingSessions,
   })
   const hasActionableStreamingPlan = hasStreamingExitPlan && !sessionSending
+  // A previous turn's tool calls can remain in the store while the next turn
+  // runs. Only pending request queues can require input during an active turn.
   const isWaitingFromMessages =
     runCanBeWaiting &&
+    !sessionSending &&
     (hasStreamingQuestion ||
       hasActionableStreamingPlan ||
       hasPendingQuestion ||
@@ -583,8 +587,6 @@ export function computeSessionCardData(
   // Check for pending permission denials (Claude-style)
   const sessionDenials = pendingPermissionDenials[session.id] ?? []
   const persistedDenials = session.pending_permission_denials ?? []
-  const hasPermissionDenials =
-    sessionDenials.length > 0 || persistedDenials.length > 0
   const permissionDenialCount =
     sessionDenials.length > 0 ? sessionDenials.length : persistedDenials.length
 
@@ -624,6 +626,12 @@ export function computeSessionCardData(
       session.selected_execution_mode ??
       'plan')
     : (executionModes[session.id] ?? session.selected_execution_mode ?? 'plan')
+  const hasPermissionDenials = shouldShowPermissionApproval({
+    pendingDenialsCount: permissionDenialCount,
+    isSending: sessionSending,
+    executionMode,
+    isCodexBackend: session.backend === 'codex',
+  })
 
   // Determine status — lossless priority matrix (actionable first, then active,
   // then terminal run outcomes). Never collapse cancelled/crashed into idle.

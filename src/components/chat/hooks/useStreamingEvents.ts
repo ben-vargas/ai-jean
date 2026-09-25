@@ -364,13 +364,13 @@ export default function useStreamingEvents({
       // Check if THIS client initiated the send (sender calls addSendingSession
       // before sendMessage.mutate, so it's already in sendingSessionIds).
       const isSender = !!useChatStore.getState().sendingSessionIds[session_id]
-      // A remote web/mobile client may start a new turn while this client still
-      // has the previous turn parked as waiting/reviewing in Zustand. Clear
-      // those stale terminal flags before marking the session as running.
+      // A new turn supersedes the previous turn's waiting state and denials.
       useChatStore.setState(state => {
         if (
           !state.waitingForInputSessionIds[session_id] &&
-          !state.reviewingSessions[session_id]
+          !state.reviewingSessions[session_id] &&
+          !state.pendingPermissionDenials[session_id] &&
+          !state.deniedMessageContext[session_id]
         ) {
           return state
         }
@@ -378,7 +378,16 @@ export default function useStreamingEvents({
           state.waitingForInputSessionIds
         const { [session_id]: _reviewing, ...reviewingSessions } =
           state.reviewingSessions
-        return { waitingForInputSessionIds, reviewingSessions }
+        const { [session_id]: _denials, ...pendingPermissionDenials } =
+          state.pendingPermissionDenials
+        const { [session_id]: _context, ...deniedMessageContext } =
+          state.deniedMessageContext
+        return {
+          waitingForInputSessionIds,
+          reviewingSessions,
+          pendingPermissionDenials,
+          deniedMessageContext,
+        }
       })
       addSendingSession(session_id)
       if (execution_mode) {
@@ -393,6 +402,8 @@ export default function useStreamingEvents({
                 waiting_for_input: false,
                 waiting_for_input_type: null,
                 is_reviewing: false,
+                pending_permission_denials: [],
+                denied_message_context: undefined,
                 last_run_status: 'running',
                 last_run_execution_mode:
                   execution_mode ?? old.last_run_execution_mode,

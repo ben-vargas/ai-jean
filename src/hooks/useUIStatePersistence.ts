@@ -14,6 +14,7 @@ import { browserBackend } from '@/hooks/useBrowserPane'
 import { isLocalBackend } from '@/lib/environment'
 import { invoke } from '@/lib/transport'
 import { logger } from '@/lib/logger'
+import { toRawLocalResourceId } from '@/lib/server-resource'
 import type { BrowserTab } from '@/types/browser'
 import type {
   PendingFile,
@@ -433,7 +434,11 @@ export function useUIStatePersistence() {
       logger.debug('Restoring active sessions', { activeSessionIds })
       const { setActiveSession } = useChatStore.getState()
       for (const [worktreeId, sessionId] of Object.entries(activeSessionIds)) {
-        setActiveSession(worktreeId, sessionId, { markOpened: false })
+        setActiveSession(
+          toRawLocalResourceId(worktreeId),
+          toRawLocalResourceId(sessionId),
+          { markOpened: false }
+        )
       }
     }
 
@@ -1082,7 +1087,10 @@ export function useUIStatePersistence() {
       const converted = Object.fromEntries(
         Object.entries(lastOpenedPerProject).map(([projectId, entry]) => [
           projectId,
-          { worktreeId: entry.worktree_id, sessionId: entry.session_id },
+          {
+            worktreeId: toRawLocalResourceId(entry.worktree_id),
+            sessionId: toRawLocalResourceId(entry.session_id),
+          },
         ])
       )
       useChatStore.setState({ lastOpenedPerProject: converted })
