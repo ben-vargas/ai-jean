@@ -165,7 +165,6 @@ pub async fn dispatch_command(
         "save_ui_state" => {
             let ui_state = field(&args, "uiState", "ui_state")?;
             crate::save_ui_state(app.clone(), ui_state).await?;
-            emit_cache_invalidation(app, &["ui-state"]);
             Ok(Value::Null)
         }
 

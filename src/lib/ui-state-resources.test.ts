@@ -16,6 +16,7 @@ describe('remote UI-state resources', () => {
     pending_images: { 'session-1': [] },
     pending_files: { 'session-1': [] },
     dismissed_setup_scripts: ['worktree-1'],
+    pinned_recent_session_ids: ['session-1'],
     last_opened_per_project: {
       'project-1': { worktree_id: 'worktree-1', session_id: 'session-1' },
     },
@@ -31,6 +32,7 @@ describe('remote UI-state resources', () => {
         pending_images: { 'remote:session-1': [] },
         pending_files: { 'remote:session-1': [] },
         dismissed_setup_scripts: ['remote:worktree-1'],
+        pinned_recent_session_ids: ['remote:session-1'],
         last_opened_per_project: {
           'remote:project-1': {
             worktree_id: 'remote:worktree-1',

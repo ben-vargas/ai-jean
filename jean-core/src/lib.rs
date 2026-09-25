@@ -29,6 +29,7 @@ extern crate self as tauri;
 mod runtime;
 pub use runtime::*;
 
+use crate::http_server::EmitExt;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -3721,6 +3722,12 @@ async fn save_ui_state(app: AppHandle, ui_state: UIState) -> Result<(), String> 
     )?;
 
     log::trace!("Saved UI state to {state_path:?}");
+    if let Err(error) = app.emit_all(
+        "cache:invalidate",
+        &serde_json::json!({ "keys": ["ui-state"] }),
+    ) {
+        log::error!("Failed to emit UI state cache invalidation: {error}");
+    }
     Ok(())
 }
 
