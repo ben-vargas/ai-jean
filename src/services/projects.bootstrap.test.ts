@@ -51,7 +51,7 @@ describe('fetchAndSeedProjectBootstrap', () => {
       sessionsByWorktree: {
         'wt-1': {
           worktree_id: 'wt-1',
-          sessions: [{ id: 's-1', name: 'Chat' }],
+          sessions: [{ id: 's-1', name: 'Chat', last_run_started_at: 100 }],
           active_session_id: 's-1',
           version: 2,
         },
@@ -79,12 +79,18 @@ describe('fetchAndSeedProjectBootstrap', () => {
       queryClient.getQueryData(['chat', 'sessions', 'wt-1', 'with-counts'])
     ).toMatchObject({
       worktree_id: 'wt-1',
-      sessions: [{ id: 's-1', name: 'Chat' }],
+      sessions: [{ id: 's-1', name: 'Chat', last_run_started_at: 100 }],
     })
     const updateSending = setChatState.mock.calls[0]?.[0]
     expect(
-      updateSending({ sendingSessionIds: { stale: true } }).sendingSessionIds
-    ).toEqual({ stale: true, 's-1': true })
+      updateSending({
+        sendingSessionIds: { stale: true },
+        sendStartedAt: { stale: 50_000 },
+      })
+    ).toEqual({
+      sendingSessionIds: { stale: true, 's-1': true },
+      sendStartedAt: { stale: 50_000, 's-1': 100_000 },
+    })
   })
 
   it('clears stale running state only for sessions in the bootstrapped project', async () => {
@@ -94,7 +100,7 @@ describe('fetchAndSeedProjectBootstrap', () => {
       sessionsByWorktree: {
         'wt-1': {
           worktree_id: 'wt-1',
-          sessions: [{ id: 's-1', name: 'Chat' }],
+          sessions: [{ id: 's-1', name: 'Chat', last_run_started_at: 100 }],
           version: 2,
         },
       },
@@ -105,8 +111,13 @@ describe('fetchAndSeedProjectBootstrap', () => {
 
     const updateSending = setChatState.mock.calls[0]?.[0]
     expect(
-      updateSending({ sendingSessionIds: { 's-1': true, other: true } })
-        .sendingSessionIds
-    ).toEqual({ other: true })
+      updateSending({
+        sendingSessionIds: { 's-1': true, other: true },
+        sendStartedAt: { 's-1': 100_000, other: 50_000 },
+      })
+    ).toEqual({
+      sendingSessionIds: { other: true },
+      sendStartedAt: { other: 50_000 },
+    })
   })
 })

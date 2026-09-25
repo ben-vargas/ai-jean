@@ -2297,6 +2297,18 @@ pub fn tail_claude_output(
                         }
                     }
                 }
+                "rate_limit_event" => {
+                    // Free usage data from the CLI — keeps the Usage UI fresh
+                    // without hitting the rate-limited OAuth usage API.
+                    if crate::claude_cli::record_claude_rate_limit_event(&msg) {
+                        if let Err(e) = app.emit_all(
+                            "cache:invalidate",
+                            &serde_json::json!({ "keys": ["claude-usage"] }),
+                        ) {
+                            log::error!("Failed to emit claude-usage cache invalidation: {e}");
+                        }
+                    }
+                }
                 _ => {
                     // Unknown msg_type. Only forward if it explicitly references an
                     // armed Monitor by tool_use_id — avoids flooding the UI with

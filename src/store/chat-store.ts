@@ -1468,7 +1468,20 @@ export const useChatStore = create<ChatUIState>()(
         set(
           state => {
             // Guard: skip no-op updates to avoid re-renders on every streaming chunk
-            if (state.sendingSessionIds[sessionId]) return state
+            if (state.sendingSessionIds[sessionId]) {
+              if (
+                startTime == null ||
+                state.sendStartedAt[sessionId] != null
+              ) {
+                return state
+              }
+              return {
+                sendStartedAt: {
+                  ...state.sendStartedAt,
+                  [sessionId]: startTime,
+                },
+              }
+            }
             const now = startTime ?? Date.now()
             const { [sessionId]: _, ...restDurations } =
               state.completedDurations

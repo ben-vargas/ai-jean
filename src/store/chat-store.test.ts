@@ -330,6 +330,18 @@ describe('ChatStore', () => {
       expect(state.sendStartedAt['session-1']).toBe(20_000)
     })
 
+    it('fills a missing start time after a running flag was set', () => {
+      useChatStore.setState({ sendingSessionIds: { 'session-1': true } })
+
+      useChatStore.getState().addSendingSession('session-1', 20_000)
+
+      expect(useChatStore.getState().sendStartedAt['session-1']).toBe(20_000)
+
+      useChatStore.getState().addSendingSession('session-1', 10_000)
+
+      expect(useChatStore.getState().sendStartedAt['session-1']).toBe(20_000)
+    })
+
     it('blocks fast completion when no current streaming state exists', () => {
       const now = Date.now()
 

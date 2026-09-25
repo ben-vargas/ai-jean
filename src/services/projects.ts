@@ -321,21 +321,44 @@ export async function fetchAndSeedProjectBootstrap(
   // A native remote-server switch does not reload App, so reconcile the
   // running indicators from this server-owned project snapshot here.
   const runningSessionIds = new Set(bootstrap.runningSessions ?? [])
+  const runningStartTimes: Record<string, number> = {}
+  for (const sessions of Object.values(sessionsByWorktree)) {
+    for (const session of sessions.sessions) {
+      if (runningSessionIds.has(session.id) && session.last_run_started_at) {
+        runningStartTimes[session.id] = session.last_run_started_at * 1000
+      }
+    }
+  }
   useChatStore.setState(state => {
     const sendingSessionIds = Object.fromEntries(
       Object.entries(state.sendingSessionIds).filter(
         ([sessionId]) => !projectSessionIds.has(sessionId)
       )
     )
+    const sendStartedAt = Object.fromEntries(
+      Object.entries(state.sendStartedAt).filter(
+        ([sessionId]) => !projectSessionIds.has(sessionId)
+      )
+    )
     for (const sessionId of runningSessionIds) {
-      if (projectSessionIds.has(sessionId)) sendingSessionIds[sessionId] = true
+      if (!projectSessionIds.has(sessionId)) continue
+      sendingSessionIds[sessionId] = true
+      const startedAt =
+        runningStartTimes[sessionId] ?? state.sendStartedAt[sessionId]
+      if (startedAt) sendStartedAt[sessionId] = startedAt
     }
     const currentIds = Object.keys(state.sendingSessionIds)
     const nextIds = Object.keys(sendingSessionIds)
+    const currentStartIds = Object.keys(state.sendStartedAt)
+    const nextStartIds = Object.keys(sendStartedAt)
     const changed =
       currentIds.length !== nextIds.length ||
-      nextIds.some(sessionId => !state.sendingSessionIds[sessionId])
-    return changed ? { sendingSessionIds } : state
+      nextIds.some(sessionId => !state.sendingSessionIds[sessionId]) ||
+      currentStartIds.length !== nextStartIds.length ||
+      nextStartIds.some(
+        sessionId => state.sendStartedAt[sessionId] !== sendStartedAt[sessionId]
+      )
+    return changed ? { sendingSessionIds, sendStartedAt } : state
   })
 
   logger.info('Project bootstrap loaded', {
