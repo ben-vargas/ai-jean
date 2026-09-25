@@ -216,6 +216,7 @@ const DESKTOP_ONLY_COMMANDS = new Set([
   'open_branch_on_github',
   'open_log_directory',
   'set_project_avatar',
+  'save_file_as',
   'start_http_server',
   'stop_http_server',
   'install_remote_jean_server',

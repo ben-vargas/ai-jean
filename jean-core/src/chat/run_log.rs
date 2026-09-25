@@ -891,8 +891,13 @@ pub fn parse_run_to_message(lines: &[String], run: &RunEntry) -> Result<ChatMess
                                     content_blocks.push(ContentBlock::ToolUse { tool_call_id: id });
                                 }
                                 "thinking" => {
-                                    if let Some(thinking) =
-                                        block.get("thinking").and_then(|v| v.as_str())
+                                    // Newer Claude models emit an empty thinking block
+                                    // before the real one. Live streaming skips it, so
+                                    // the snapshot must too or reopen merges duplicate.
+                                    if let Some(thinking) = block
+                                        .get("thinking")
+                                        .and_then(|v| v.as_str())
+                                        .filter(|t| !t.is_empty())
                                     {
                                         content_blocks.push(ContentBlock::Thinking {
                                             thinking: thinking.to_string(),
@@ -2186,6 +2191,30 @@ Move services between instances without downtime.
             msg.tool_calls[0].output.as_deref(),
             Some("Findings: auth uses JWT middleware.\nEntry point is `src/auth.rs`.")
         );
+    }
+
+    #[test]
+    fn parse_run_skips_empty_thinking_blocks() {
+        let run = sample_run();
+        let lines = vec![
+            serde_json::json!({
+                "type": "assistant",
+                "message": { "content": [{ "type": "thinking", "thinking": "" }] }
+            })
+            .to_string(),
+            serde_json::json!({
+                "type": "assistant",
+                "message": { "content": [{ "type": "text", "text": "Hello" }] }
+            })
+            .to_string(),
+        ];
+
+        let msg = parse_run_to_message(&lines, &run).unwrap();
+
+        assert!(matches!(
+            msg.content_blocks.as_slice(),
+            [ContentBlock::Text { text }] if text == "Hello"
+        ));
     }
 
     #[test]

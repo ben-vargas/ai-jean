@@ -574,10 +574,18 @@ function ChatWindowContent({
   // Rebuild streamingContentBlocks from snapshot when opening a session whose
   // last message is still running. Covers web-access click-to-open, sidebar
   // navigation, and any other entry that bypasses App.tsx auto-resume.
+  const hydratedRunningSnapshotsRef = useRef<Set<string> | null>(null)
   useEffect(() => {
     if (!deferredSessionId || !session) return
     const lastMsg = session.messages.at(-1)
     if (lastMsg?.role === 'assistant' && lastMsg.id.startsWith('running-')) {
+      // Hydrate each running message once. The session query refetches while
+      // the turn streams; merging every refetched snapshot into live blocks
+      // (and resetting the replay cursor) duplicates the streamed output.
+      hydratedRunningSnapshotsRef.current ??= new Set()
+      const hydrateKey = `${deferredSessionId}:${lastMsg.id}`
+      if (hydratedRunningSnapshotsRef.current.has(hydrateKey)) return
+      hydratedRunningSnapshotsRef.current.add(hydrateKey)
       // Live chunks can reach Web Access before this session query finishes.
       // Always merge the persisted snapshot ahead of those chunks so opening a
       // running session includes output produced before this client connected.

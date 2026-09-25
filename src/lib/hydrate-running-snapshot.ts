@@ -119,7 +119,15 @@ export function hydrateRunningSnapshot(
   options: { allowWhileSending?: boolean; dedupeReplayedOutput?: boolean } = {}
 ): void {
   const store = useChatStore.getState()
-  const normalized = coalesceContentBlocks(lastMsg.content_blocks ?? [])
+  // Live streaming never adds empty text/thinking blocks. Drop them here so
+  // the snapshot and live blocks line up and merge without duplicates.
+  const normalized = coalesceContentBlocks(
+    (lastMsg.content_blocks ?? []).filter(
+      block =>
+        !(block.type === 'thinking' && !block.thinking) &&
+        !(block.type === 'text' && !block.text)
+    )
+  )
   if (options.dedupeReplayedOutput) {
     store.setStreamingReplayContentBlocks(sessionId, normalized)
   }

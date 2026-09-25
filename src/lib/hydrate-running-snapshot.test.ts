@@ -39,6 +39,39 @@ describe('hydrateRunningSnapshot', () => {
     })
   })
 
+  it('ignores empty thinking blocks so live blocks are not duplicated', () => {
+    // Live streaming skips Claude's empty thinking placeholder.
+    useChatStore.setState({
+      streamingContentBlocks: {
+        'session-1': [
+          { type: 'text', text: 'Checking the card.' },
+          { type: 'tool_use', tool_call_id: 'tool-1' },
+        ],
+      },
+    })
+
+    hydrateRunningSnapshot(
+      'session-1',
+      assistantMessage({
+        content_blocks: [
+          { type: 'thinking', thinking: '' },
+          { type: 'text', text: 'Checking the card.' },
+          { type: 'tool_use', tool_call_id: 'tool-1' },
+          { type: 'thinking', thinking: '' },
+          { type: 'text', text: 'Sending the purchase.' },
+        ],
+      })
+    )
+
+    expect(useChatStore.getState().streamingContentBlocks['session-1']).toEqual(
+      [
+        { type: 'text', text: 'Checking the card.' },
+        { type: 'tool_use', tool_call_id: 'tool-1' },
+        { type: 'text', text: 'Sending the purchase.' },
+      ]
+    )
+  })
+
   it('skips hydration while sending by default', () => {
     useChatStore.setState({
       sendingSessionIds: { 'session-1': true },

@@ -299,6 +299,20 @@ fn stream_event_input_delta(msg: &serde_json::Value) -> Option<(usize, &str)> {
     Some((index, delta.get("partial_json")?.as_str()?))
 }
 
+/// Complete tool input from streamed `input_json_delta` chunks, or `None`
+/// while the JSON is still incomplete. Claude CLI sends an empty first delta
+/// after a `content_block_start` with `input: {}`; that is not a finished input.
+fn streamed_tool_input(
+    start_input: &serde_json::Value,
+    input_buf: &str,
+) -> Option<serde_json::Value> {
+    if input_buf.trim().is_empty() {
+        let has_input = start_input.as_object().is_some_and(|obj| !obj.is_empty());
+        return has_input.then(|| start_input.clone());
+    }
+    serde_json::from_str(input_buf).ok()
+}
+
 // =============================================================================
 // Detached Claude CLI execution
 // =============================================================================
@@ -1561,13 +1575,8 @@ pub fn tail_claude_output(
                     let input_buf = pending_stream_tool_inputs.entry(index).or_default();
                     input_buf.push_str(partial_json);
 
-                    let input = if input_buf.trim().is_empty() {
-                        pending_tool.input.clone()
-                    } else {
-                        match serde_json::from_str::<serde_json::Value>(input_buf) {
-                            Ok(value) => value,
-                            Err(_) => continue,
-                        }
+                    let Some(input) = streamed_tool_input(&pending_tool.input, input_buf) else {
+                        continue;
                     };
 
                     if pending_tool.name == "AskUserQuestion" || pending_tool.name == "ExitPlanMode"
@@ -1924,8 +1933,10 @@ pub fn tail_claude_output(
                                         }
                                     }
                                     "thinking" => {
-                                        if let Some(thinking) =
-                                            block.get("thinking").and_then(|v| v.as_str())
+                                        if let Some(thinking) = block
+                                            .get("thinking")
+                                            .and_then(|v| v.as_str())
+                                            .filter(|t| !t.is_empty())
                                         {
                                             // Thinking events must not overtake buffered text.
                                             flush_pending_chunks(
@@ -2710,6 +2721,21 @@ mod tests {
             tool.input.get("questions").and_then(|value| value.as_str()),
             Some("[{\"question\":\"Pick one\",\"options\":[{\"label\":\"A\"}]}]")
         );
+    }
+
+    #[test]
+    fn streamed_tool_input_waits_for_complete_json() {
+        let empty = serde_json::json!({});
+        // Claude CLI 2.1.x sends `input: {}` then an empty first delta.
+        assert_eq!(streamed_tool_input(&empty, ""), None);
+        assert_eq!(streamed_tool_input(&empty, "{\"questions\": [{"), None);
+        assert_eq!(
+            streamed_tool_input(&empty, "{\"questions\": []}"),
+            Some(serde_json::json!({ "questions": [] }))
+        );
+
+        let full = serde_json::json!({ "plan": "Do it" });
+        assert_eq!(streamed_tool_input(&full, ""), Some(full.clone()));
     }
 
     #[test]

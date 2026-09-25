@@ -69,6 +69,21 @@ export function getAdjacentRecentRow(
   return rows[nextIndex]
 }
 
+/**
+ * Pinned rows first. Inside the pinned and unpinned groups, running rows go
+ * first. All other rows keep the incoming recent-activity order, so a
+ * finished row goes back to its normal position.
+ */
+export function sortRecentRows(
+  rows: RecentWorktreeItem[],
+  pinnedSessionIds: ReadonlySet<string>,
+  isRunning: (row: RecentWorktreeItem) => boolean
+): RecentWorktreeItem[] {
+  const rank = (row: RecentWorktreeItem) =>
+    (pinnedSessionIds.has(row.session.id) ? 0 : 2) + (isRunning(row) ? 0 : 1)
+  return [...rows].sort((a, b) => rank(a) - rank(b))
+}
+
 export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
   const isMobile = useIsMobile()
   const queryClient = useQueryClient()
@@ -121,19 +136,28 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
     .some(row => isSnoozedSession(row.lastActivityAt))
   const displayedRows = useMemo(() => {
     const pinned = new Set(pinnedSessionIds)
-    return rows
-      .filter(
-        row =>
-          showSnoozed ||
-          pinned.has(row.session.id) ||
-          !isSnoozedSession(row.lastActivityAt)
-      )
-      .sort((a, b) => {
-        const aPinned = pinned.has(a.session.id)
-        const bPinned = pinned.has(b.session.id)
-        return aPinned === bPinned ? 0 : aPinned ? -1 : 1
-      })
-  }, [pinnedSessionIds, rows, showSnoozed])
+    const visibleRows = rows.filter(
+      row =>
+        showSnoozed ||
+        pinned.has(row.session.id) ||
+        !isSnoozedSession(row.lastActivityAt)
+    )
+    return sortRecentRows(
+      visibleRows,
+      pinned,
+      row =>
+        getRecentSessionStatus(row.session, {
+          sending: sendingSessionIds[row.session.id] ?? false,
+          waiting: waitingForInputSessionIds[row.session.id] ?? false,
+        }).tone === 'working'
+    )
+  }, [
+    pinnedSessionIds,
+    rows,
+    showSnoozed,
+    sendingSessionIds,
+    waitingForInputSessionIds,
+  ])
   const recentProjectKey = useMemo(
     () => [...new Set(rows.map(row => row.projectId))].sort().join('\0'),
     [rows]

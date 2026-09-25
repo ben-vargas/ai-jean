@@ -1112,6 +1112,16 @@ export function useUIStatePersistence() {
     }
   }, [uiStateLoaded, uiState, projects, projectsLoaded, isInitialized])
 
+  // Pinned recent sessions are shared across native and web clients. Apply
+  // them again whenever another client's save refetches the UI state.
+  const serverPinnedRecentSessionIdsRef = useRef<string[] | null>(null)
+  useEffect(() => {
+    if (!isInitialized || !uiState) return
+    const pinned = uiState.pinned_recent_session_ids ?? []
+    serverPinnedRecentSessionIdsRef.current = pinned
+    useProjectsStore.getState().setPinnedRecentSessionIds(pinned)
+  }, [isInitialized, uiState])
+
   // Step 2: Subscribe to store changes and save (debounced)
   useEffect(() => {
     // Don't start saving until we've initialized from persisted state
@@ -1152,8 +1162,10 @@ export function useUIStatePersistence() {
       const nextPinnedCanvasSettings = JSON.stringify(getPinnedCanvasSettings())
       const pinnedCanvasSettingsChanged =
         nextPinnedCanvasSettings !== prevPinnedCanvasSettings
+      // Do not save pins that came from the server; that only echoes them.
       const pinnedRecentSessionIdsChanged =
-        state.pinnedRecentSessionIds !== prevPinnedRecentSessionIds
+        state.pinnedRecentSessionIds !== prevPinnedRecentSessionIds &&
+        state.pinnedRecentSessionIds !== serverPinnedRecentSessionIdsRef.current
 
       if (
         selectedProjectChanged ||

@@ -124,7 +124,7 @@ describe('RecentWorktreesList structure', () => {
     expect(source).toContain("weight={isPinned ? 'Filled' : 'Outline'}")
     expect(source).toContain('toggleRecentSessionPinned(row.session.id)')
     expect(source).toContain('pinned.has(row.session.id)')
-    expect(source).toContain('aPinned === bPinned ? 0 : aPinned ? -1 : 1')
+    expect(source).toContain('return sortRecentRows(')
     expect(source).toContain('opacity-100')
     expect(source).toContain('md:opacity-0')
     expect(source).toContain('md:group-hover:opacity-100')
