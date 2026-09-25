@@ -665,7 +665,7 @@ fn build_claude_args(
         args.push("--chrome".to_string());
         // Claude in Chrome asks for per-site approval even in bypassPermissions
         // mode (allow rules do not skip it), and headless runs deny every ask.
-        // In YOLO, route those asks to Jean MCP, which approves Chrome tools.
+        // In YOLO, route every ask to Jean MCP, which approves it.
         if execution_mode == Some("yolo") {
             if let Some(tool) = jean_permission_prompt_tool(mcp_config) {
                 args.push("--permission-prompt-tool".to_string());

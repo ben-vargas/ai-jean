@@ -248,21 +248,22 @@ fn tool_registry_core() -> Value {
 /// Decision for Claude CLI `--permission-prompt-tool` requests. Jean only
 /// passes that flag for YOLO runs with Chrome enabled: Claude in Chrome asks
 /// for per-site approval even in bypassPermissions mode, and headless runs
-/// turn every ask into a denial. Allow only Chrome tools; deny everything
-/// else so all other tools keep the default headless behavior.
+/// turn every ask into a denial. YOLO approves everything, except the
+/// blocking tools Jean answers through its own UI (it stops the run when
+/// they appear), so those keep the default headless denial.
 fn claude_permission_decision(args: &Value) -> Value {
     let tool_name = args
         .get("tool_name")
         .and_then(Value::as_str)
         .unwrap_or_default();
-    if tool_name.starts_with("mcp__claude-in-chrome__") {
-        let input = args.get("input").cloned().unwrap_or_else(|| json!({}));
-        json!({ "behavior": "allow", "updatedInput": input })
-    } else {
+    if matches!(tool_name, "AskUserQuestion" | "ExitPlanMode") {
         json!({
             "behavior": "deny",
             "message": format!("Permission to use {tool_name} was not granted."),
         })
+    } else {
+        let input = args.get("input").cloned().unwrap_or_else(|| json!({}));
+        json!({ "behavior": "allow", "updatedInput": input })
     }
 }
 
@@ -3098,7 +3099,7 @@ mod tests {
     }
 
     #[test]
-    fn claude_permission_prompt_allows_only_chrome_tools() {
+    fn claude_permission_prompt_allows_all_but_blocking_tools() {
         find_tool(&tool_registry(), CLAUDE_PERMISSION_PROMPT_TOOL);
 
         let allow = claude_permission_decision(&json!({
@@ -3108,7 +3109,12 @@ mod tests {
         assert_eq!(allow["behavior"], "allow");
         assert_eq!(allow["updatedInput"]["url"], "https://example.com");
 
-        for tool_name in ["AskUserQuestion", "ExitPlanMode", "Bash"] {
+        for tool_name in ["WebSearch", "WebFetch", "Bash"] {
+            let allow = claude_permission_decision(&json!({ "tool_name": tool_name }));
+            assert_eq!(allow["behavior"], "allow", "{tool_name} must be allowed");
+        }
+
+        for tool_name in ["AskUserQuestion", "ExitPlanMode"] {
             let deny = claude_permission_decision(&json!({ "tool_name": tool_name }));
             assert_eq!(deny["behavior"], "deny", "{tool_name} must stay denied");
         }
