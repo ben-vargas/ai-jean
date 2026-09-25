@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   keepPreviousData,
   useQuery,
@@ -29,6 +30,8 @@ const SNOOZE_AFTER_SECONDS = 24 * 60 * 60
 
 interface RecentWorktreesListProps {
   projects: Project[]
+  /** Sidebar footer slot for the "Show more" actions (next to Settings). */
+  footerActionsContainer?: HTMLElement | null
 }
 
 export function formatRecentActivity(
@@ -84,7 +87,10 @@ export function sortRecentRows(
   return [...rows].sort((a, b) => rank(a) - rank(b))
 }
 
-export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
+export function RecentWorktreesList({
+  projects,
+  footerActionsContainer,
+}: RecentWorktreesListProps) {
   const isMobile = useIsMobile()
   const queryClient = useQueryClient()
   const selectProject = useProjectsStore(state => state.selectProject)
@@ -281,6 +287,44 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
     (query.data?.failedServerIds.length ?? 0) +
     (query.data?.failedWorktreeIds.length ?? 0)
   const hiddenCount = Math.max(0, (query.data?.total ?? rows.length) - limit)
+  const footerButtonClass =
+    'flex h-8 items-center justify-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+  const footerActions = (
+    <>
+      {hiddenCount > 0 && !snoozedBoundaryLoaded && (
+        <button
+          type="button"
+          className={footerButtonClass}
+          onClick={() => setLimit(value => value + RECENT_PAGE_SIZE)}
+        >
+          <Plus className="size-3.5" /> Show{' '}
+          {Math.min(hiddenCount, RECENT_PAGE_SIZE)} more
+        </button>
+      )}
+      {snoozedBoundaryLoaded && !showSnoozed && (
+        <button
+          type="button"
+          className={footerButtonClass}
+          onClick={() => {
+            setShowSnoozed(true)
+            setLimit(value => value + RECENT_PAGE_SIZE)
+          }}
+        >
+          Show snoozed sessions
+        </button>
+      )}
+      {showSnoozed && hiddenCount > 0 && (
+        <button
+          type="button"
+          className={footerButtonClass}
+          onClick={() => setLimit(value => value + RECENT_PAGE_SIZE)}
+        >
+          <Plus className="size-3.5" /> Show{' '}
+          {Math.min(hiddenCount, RECENT_PAGE_SIZE)} more
+        </button>
+      )}
+    </>
+  )
 
   return (
     <div
@@ -427,42 +471,13 @@ export function RecentWorktreesList({ projects }: RecentWorktreesListProps) {
           })}
         </ul>
       </div>
-      {(hiddenCount > 0 ||
-        failedCount > 0 ||
-        (snoozedBoundaryLoaded && !showSnoozed)) && (
+      {footerActionsContainer &&
+        createPortal(footerActions, footerActionsContainer)}
+      {(failedCount > 0 ||
+        (!footerActionsContainer &&
+          (hiddenCount > 0 || (snoozedBoundaryLoaded && !showSnoozed)))) && (
         <div className="shrink-0 border-t border-border/40 p-2">
-          {hiddenCount > 0 && !snoozedBoundaryLoaded && (
-            <button
-              type="button"
-              className="flex h-8 w-full items-center justify-center gap-1 rounded-md text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-              onClick={() => setLimit(value => value + RECENT_PAGE_SIZE)}
-            >
-              <Plus className="size-3.5" /> Show{' '}
-              {Math.min(hiddenCount, RECENT_PAGE_SIZE)} more
-            </button>
-          )}
-          {snoozedBoundaryLoaded && !showSnoozed && (
-            <button
-              type="button"
-              className="flex h-8 w-full items-center justify-center rounded-md text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-              onClick={() => {
-                setShowSnoozed(true)
-                setLimit(value => value + RECENT_PAGE_SIZE)
-              }}
-            >
-              Show snoozed sessions
-            </button>
-          )}
-          {showSnoozed && hiddenCount > 0 && (
-            <button
-              type="button"
-              className="flex h-8 w-full items-center justify-center gap-1 rounded-md text-xs text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-              onClick={() => setLimit(value => value + RECENT_PAGE_SIZE)}
-            >
-              <Plus className="size-3.5" /> Show{' '}
-              {Math.min(hiddenCount, RECENT_PAGE_SIZE)} more
-            </button>
-          )}
+          {!footerActionsContainer && footerActions}
           {failedCount > 0 && (
             <div
               role="status"

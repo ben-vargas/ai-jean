@@ -77,6 +77,9 @@ export function ProjectsSidebar() {
   const setActiveTab = useProjectsStore(state => state.setSidebarActiveTab)
   const [searchQuery, setSearchQuery] = useState('')
   const [appVersion, setAppVersion] = useState(FALLBACK_APP_VERSION)
+  const [footerActionsEl, setFooterActionsEl] = useState<HTMLDivElement | null>(
+    null
+  )
   const serverSnapshots = useServerConnectionSnapshots()
   const serverIds = useMemo(
     () => [...new Set(projects.map(projectServerId))],
@@ -343,7 +346,10 @@ export function ProjectsSidebar() {
             )}
           </div>
         ) : (
-          <RecentWorktreesList projects={visibleProjects} />
+          <RecentWorktreesList
+            projects={visibleProjects}
+            footerActionsContainer={footerActionsEl}
+          />
         )}
       </div>
       <div
@@ -363,6 +369,10 @@ export function ProjectsSidebar() {
           </TooltipTrigger>
           <TooltipContent side="right">Settings</TooltipContent>
         </Tooltip>
+        <div
+          ref={setFooterActionsEl}
+          className="flex min-w-0 flex-1 justify-center"
+        />
         <button
           type="button"
           onClick={() =>

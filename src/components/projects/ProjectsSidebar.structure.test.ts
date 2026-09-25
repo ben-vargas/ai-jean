@@ -10,9 +10,9 @@ describe('ProjectsSidebar server filter', () => {
 
     expect(source).toContain('role="tablist"')
     expect(source).toContain("(['projects', 'recent'] as const)")
-    expect(source).toContain(
-      '<RecentWorktreesList projects={visibleProjects} />'
-    )
+    expect(source).toContain('<RecentWorktreesList')
+    expect(source).toContain('footerActionsContainer={footerActionsEl}')
+    expect(source).toContain('ref={setFooterActionsEl}')
     expect(source).toContain('state => state.sidebarActiveTab')
     expect(source).toContain('state => state.setSidebarActiveTab')
   })
