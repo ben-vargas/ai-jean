@@ -3066,9 +3066,9 @@ pub async fn send_chat_message(
             // A new prompt supersedes denials from the previous turn.
             session.pending_permission_denials.clear();
             session.denied_message_context = None;
-            if session.status_override.as_deref() == Some("review") {
-                session.status_override = None;
-            }
+            // A new run returns the session to automatic status, so fresh
+            // plan/question/permission prompts are not hidden by a manual pin.
+            session.status_override = None;
             session.waiting_for_input_type = None;
         }
         Ok(())

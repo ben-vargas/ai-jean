@@ -56,9 +56,12 @@ export type SessionStatus =
   | 'crashed'
 
 /**
- * User-settable status overrides. Automatic live states (running, waiting for
- * input, permissions, …) still win while active; the override applies once the
- * session is idle/terminal so users can pin review/completed/cancelled/idle.
+ * User-settable status overrides. Automatic live states (running, scheduled,
+ * crashed) still win; the override applies once the session is idle/terminal
+ * so users can pin review/completed/cancelled/idle. Persisted waiting states
+ * (stale permission denials, unanswered plans) yield to an explicit
+ * completed/cancelled/idle override while no run is active — a new run clears
+ * the override.
  */
 export type ManualSessionStatus = 'idle' | 'review' | 'completed' | 'cancelled'
 
@@ -706,9 +709,18 @@ export function computeSessionCardData(
     sessionStatusOverrides: sessionStatusOverrides ?? {},
     reviewingSessions,
   })
-  // Manual override sits next to automatic status: live/actionable automatic
-  // states still win; otherwise the user-pinned override is displayed.
-  if (statusOverride && !isAutomaticPriorityStatus(automaticStatus)) {
+  // Manual override sits next to automatic status: live automatic states still
+  // win; otherwise the user-pinned override is displayed. Waiting states only
+  // win while a run is active — when idle they come from persisted flags the
+  // user explicitly dismissed by picking a status. 'review' is excluded because
+  // the backend also sets it automatically on run completion.
+  if (
+    statusOverride &&
+    (!isAutomaticPriorityStatus(automaticStatus) ||
+      (statusOverride !== 'review' &&
+        !sessionSending &&
+        isActionableWaitingStatus(automaticStatus)))
+  ) {
     status = statusOverride
   }
 
@@ -758,10 +770,13 @@ export function createSessionCardDataCache(): (
   session: Session,
   storeState: ChatStoreState
 ) => SessionCardData {
-  const cache = new WeakMap<Session, {
-    fingerprint: readonly unknown[]
-    card: SessionCardData
-  }>()
+  const cache = new WeakMap<
+    Session,
+    {
+      fingerprint: readonly unknown[]
+      card: SessionCardData
+    }
+  >()
 
   return (session, storeState) => {
     const sessionId = session.id
@@ -844,7 +859,8 @@ export function getResumeSessionId(session: Session): string | null {
   if (session.backend === 'pi') return session.pi_session_id ?? null
   if (session.backend === 'grok') return session.grok_session_id ?? null
   if (session.backend === 'kimi') return session.kimi_session_id ?? null
-  if (session.backend === 'antigravity') return session.antigravity_session_id ?? null
+  if (session.backend === 'antigravity')
+    return session.antigravity_session_id ?? null
   return null
 }
 

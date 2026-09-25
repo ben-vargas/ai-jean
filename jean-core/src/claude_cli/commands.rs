@@ -628,6 +628,9 @@ pub struct ClaudeUsageWindowSnapshot {
 #[serde(rename_all = "camelCase")]
 pub struct ClaudeUsageSnapshot {
     pub plan_type: Option<String>,
+    /// Raw OAuth `rateLimitTier` (e.g. `default_claude_max_20x`) for plan labels.
+    #[serde(default)]
+    pub plan_tier: Option<String>,
     pub session: Option<ClaudeUsageWindowSnapshot>,
     pub weekly: Option<ClaudeUsageWindowSnapshot>,
     pub sonnet_weekly: Option<ClaudeUsageWindowSnapshot>,
@@ -1437,6 +1440,10 @@ pub(crate) async fn get_claude_usage_with_source(
             .claude_ai_oauth
             .as_ref()
             .and_then(|o| o.subscription_type.clone()),
+        plan_tier: credentials
+            .claude_ai_oauth
+            .as_ref()
+            .and_then(|o| o.rate_limit_tier.clone()),
         session: map_window(usage.five_hour),
         weekly: map_window(usage.seven_day),
         sonnet_weekly: map_window(usage.seven_day_sonnet),
@@ -1596,6 +1603,22 @@ mod tests {
             ..Default::default()
         };
         assert!(token_needs_refresh(&secs, now_ms));
+    }
+
+    #[test]
+    fn usage_snapshot_without_plan_tier_still_parses() {
+        let raw = r#"{
+            "planType": "max",
+            "session": null,
+            "weekly": null,
+            "sonnetWeekly": null,
+            "extraUsageSpent": null,
+            "extraUsageLimit": null,
+            "fetchedAt": 1
+        }"#;
+        let snapshot: ClaudeUsageSnapshot = serde_json::from_str(raw).expect("parse");
+        assert_eq!(snapshot.plan_type.as_deref(), Some("max"));
+        assert_eq!(snapshot.plan_tier, None);
     }
 
     #[test]
