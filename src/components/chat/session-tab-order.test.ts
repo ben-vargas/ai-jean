@@ -101,6 +101,23 @@ describe('resolveModalSessionId', () => {
   it('ignores a backend selection absent from the current list', () => {
     expect(resolveModalSessionId(undefined, ['empty'], 'removed')).toBe('empty')
   })
+
+  it('falls back to the backend selection when the active session is gone', () => {
+    expect(
+      resolveModalSessionId(
+        'deleted',
+        ['first', 'last-used'],
+        'last-used',
+        true
+      )
+    ).toBe('last-used')
+  })
+
+  it('falls back to the first session when the active session is gone', () => {
+    expect(resolveModalSessionId('deleted', ['first'], null, true)).toBe(
+      'first'
+    )
+  })
 })
 
 describe('resolveInitialActiveSessionId', () => {

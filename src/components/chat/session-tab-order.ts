@@ -23,13 +23,17 @@ export function sortSessionCardsForTabs(
  * transient response can be empty or omit the active session. Selecting the
  * first returned session here would move the user without an explicit action.
  * Removal handlers select the next session before they clear the old one.
+ *
+ * Drop the store's session only when it is confirmed gone (the direct lookup
+ * failed), so a stale id never leaves the tab row without a selection.
  */
 export function resolveModalSessionId(
   activeSessionId: string | undefined,
   sessionIds: readonly string[],
-  backendActiveSessionId?: string | null
+  backendActiveSessionId?: string | null,
+  activeSessionGone = false
 ): string | null {
-  if (activeSessionId) return activeSessionId
+  if (activeSessionId && !activeSessionGone) return activeSessionId
   if (backendActiveSessionId && sessionIds.includes(backendActiveSessionId)) {
     return backendActiveSessionId
   }

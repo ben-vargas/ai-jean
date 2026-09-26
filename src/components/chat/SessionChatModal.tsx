@@ -235,22 +235,32 @@ export function SessionChatModal({
   const activeSessionId = useChatStore(
     state => state.activeSessionIds[worktreeId]
   )
+  const activeSessionIsListed =
+    !!activeSessionId &&
+    sessions.some(session => session.id === activeSessionId)
+  const { data: missingActiveSession, isError: missingActiveSessionFailed } =
+    useSession(
+      activeSessionIsListed ? null : (activeSessionId ?? null),
+      worktreeId || null,
+      worktreePath || null
+    )
+  // A deleted session keeps its id in the store (persisted UI state, other
+  // clients). Once the list has loaded and the direct lookup fails, fall back
+  // to a listed session so one tab is always selected.
+  const activeSessionGone = !!sessionsData && missingActiveSessionFailed
   const currentSessionId = resolveModalSessionId(
     activeSessionId,
     sessions.map(session => session.id),
-    sessionsData?.active_session_id
-  )
-  const activeSessionIsListed =
-    !!currentSessionId &&
-    sessions.some(session => session.id === currentSessionId)
-  const { data: missingActiveSession } = useSession(
-    activeSessionIsListed ? null : (currentSessionId ?? null),
-    worktreeId || null,
-    worktreePath || null
+    sessionsData?.active_session_id,
+    activeSessionGone
   )
   const tabSessions = useMemo(
-    () => sessionsForTabBar(sessions, missingActiveSession ?? null),
-    [missingActiveSession, sessions]
+    () =>
+      sessionsForTabBar(
+        sessions,
+        activeSessionGone ? null : (missingActiveSession ?? null)
+      ),
+    [activeSessionGone, missingActiveSession, sessions]
   )
   const showSessionTabs = tabSessions.length > 0 || !!currentSessionId
   const serverId = parseServerResourceKey(worktreeId)?.serverId
